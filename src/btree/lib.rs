@@ -34,8 +34,7 @@ pub struct BTree<K, V> {
 enum ActionNeeded<K> {
     NoAction,
     Split,
-    UpdateLeft(K),
-    Unfreeze
+    UpdateLeft(K)
 }
 
 impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> Node<K, V>
@@ -135,7 +134,6 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> BTree<K, V>
                 self.root = Internal(~NodeInternal::new(split_key, left, right));
                 self.set(key, value);
             }
-            Unfreeze => fail!("no supported!!!")
         }
     }
 
@@ -214,11 +212,13 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> NodeLeaf<K, V>
     #[inline(always)]
     fn get<'a>(&'a self, key: &K) -> Option<&'a V>
     {
+        unsafe {
         for i in range(0, self.used) {
-            if *key == self.keys[i] {
+            if *key == self.keys.unsafe_get(i) {
                 return Some(&self.values[i]);
             }
         }
+        } 
         None
     }
 
@@ -320,10 +320,10 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> NodeInternal<K, V>
                     self.keys[idx] = left;
                     UpdateLeft(self.keys[self.used-2].clone())
                 } else {
-                    UpdateLeft(left)
+                    NoAction
+                    //UpdateLeft(left)
                 }
             } 
-            Unfreeze => fail!("not supported")
         }
     }
 
