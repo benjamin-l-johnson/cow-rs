@@ -1,10 +1,11 @@
 
 extern mod extra;
 
+use std::kinds::{Freeze, Send};
 use std::num::{zero, Zero};
 use std::util;
 
-//use extra::arc::Arc;
+use extra::arc::Arc;
 
 static LEAF_SIZE: uint = 63;
 static INTERNAL_SIZE: uint = 32;
@@ -24,7 +25,9 @@ struct NodeInternal<K, V> {
 enum Node<K, V> {
     Empty,
     Internal(~NodeInternal<K, V>),
-    Leaf(~NodeLeaf<K, V>)
+    Leaf(~NodeLeaf<K, V>),
+    SharedInternal(Arc<~NodeInternal<K, V>>),
+    SharedLeaf(Arc<~NodeLeaf<K, V>>)
 }
 
 pub struct BTree<K, V> {
@@ -34,12 +37,26 @@ pub struct BTree<K, V> {
 enum ActionNeeded<K> {
     NoAction,
     Split,
-    UpdateLeft(K)
+    UpdateLeft(K),
+    Unfreeze
 }
 
-impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> Node<K, V>
+impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for Node<K, V>
 {
+    fn clone(&self) -> Node<K, V>
+    {
+        match *self {
+            Empty => Empty,
+            Internal(ref node) => Internal(node.clone()),
+            Leaf(ref leaf) => Leaf(leaf.clone()), 
+            SharedInternal(ref node) => SharedInternal(node.clone()),
+            SharedLeaf(ref leaf) => SharedLeaf(leaf.clone()), 
+        }
+    }
+}
 
+impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Node<K, V>
+{
     #[inline(always)]
     pub fn set(&mut self, key: &K, value: &V) -> ActionNeeded<K>
     {
@@ -54,7 +71,13 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> Node<K, V>
             },
             Internal(ref mut node) => {
                 (*node).set(key, value)
-            }
+            },
+            SharedLeaf(_) => {
+                Unfreeze
+            },
+            SharedInternal(_) => {
+                Unfreeze
+            },
         }
     }
 
@@ -70,7 +93,13 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> Node<K, V>
             },
             Internal(ref node) => {
                 (*node).get(key)
-            }
+            },
+            SharedLeaf(ref leaf) => {
+                (*leaf).get().get(key)
+            },
+            SharedInternal(ref node) => {
+                (*node).get().get(key)
+            },
         }
     }
 
@@ -92,21 +121,69 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> Node<K, V>
         }
     }
 
-    pub fn print(&self)
+    #[inline(always)]
+    pub fn freeze(&mut self)
     {
-        println(format!("self.nodes {:?}", self));
+        match *self {
+            Empty | SharedLeaf(_) | SharedInternal(_) => return,
+            Internal(_) | Leaf(_) => ()
+        };
+
+        let mut old = Empty;
+        util::swap(&mut old, self);
+
+        *self = match old {
+            Internal(mut node) => {
+                node.freeze_children();
+                SharedInternal(Arc::new(node))
+            },
+            Leaf(leaf) => {
+                SharedLeaf(Arc::new(leaf))
+            },
+            _ => {fail!("This should not have been reached")}
+        };
+    }
+
+    #[inline(always)]
+    pub fn unfreeze(&mut self)
+    {
+        match *self {
+            Empty | Internal(_) | Leaf(_) => return,
+            SharedLeaf(_) | SharedInternal(_) => ()
+        };
+
+        let mut old = Empty;
+        util::swap(&mut old, self);
+
+        *self = match old {
+            SharedInternal(node) => {
+                Internal(node.get().clone())
+            },
+            SharedLeaf(leaf) => {
+                Leaf(leaf.get().clone())
+            },
+            _ => {old}
+        };
     }
 }
 
+impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for BTree<K, V>
+{
+    fn clone(&self) -> BTree<K, V>
+    {
+        BTree {
+            root: self.root.clone()
+        }    
+    }
+}
 
-impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> BTree<K, V>
+impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> BTree<K, V>
 {
     pub fn new() -> BTree<K, V>
     {
         BTree {
             root: Empty
         }
-
     }
 
     pub fn set(&mut self, key: &K, value: &V)
@@ -114,6 +191,10 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> BTree<K, V>
         match self.root.set(key, value) {
             NoAction => (),
             UpdateLeft(_) => (),
+            Unfreeze => {
+                self.root.unfreeze();
+                self.set(key, value);
+            }
             Split => {
                 let (split_key, right) = match self.root {
                     Leaf(ref mut leaf) => {
@@ -142,13 +223,36 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> BTree<K, V>
         self.root.get(key)
     }
 
-    pub fn print(&self)
+    pub fn freeze(&mut self)
     {
-        self.root.print();
+        self.root.freeze()
+    }
+
+    pub fn unfreeze(&mut self)
+    {
+        self.root.unfreeze()
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> NodeLeaf<K, V>
+
+impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
+{
+    fn clone(&self) -> NodeLeaf<K, V>
+    {
+        let mut new = NodeLeaf::new();
+
+        new.used = self.used;
+
+        for i in range(0, self.used) {
+            new.values[i] = self.values[i].clone();
+            new.keys[i] = self.keys[i].clone();
+        }
+
+        new
+    }
+}
+
+impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeLeaf<K, V>
 {
     fn new() -> NodeLeaf<K, V>
     {
@@ -238,7 +342,27 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> NodeLeaf<K, V>
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> NodeInternal<K, V>
+impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for NodeInternal<K, V>
+{
+    fn clone(&self) -> NodeInternal<K, V>
+    {
+        let mut new = NodeInternal::new_empty();
+
+        for i in range(0, self.used) {
+            new.children[i] = self.children[i].clone();
+        }
+
+        for i in range(0, self.used-1) {
+            new.keys[i] = self.keys[i].clone();
+        }
+
+        new.used = self.used;
+
+        new
+    }
+}
+
+impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K, V>
 {
     fn new(key: K, left: Node<K, V>, right: Node<K, V>) -> NodeInternal<K, V>
     {
@@ -291,6 +415,10 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> NodeInternal<K, V>
 
         match self.children[idx].set(key, value) {
             NoAction => (NoAction),
+            Unfreeze => {
+                self.children[idx].unfreeze();
+                self.set(key, value)
+            }
             Split => {
                 if self.used == INTERNAL_SIZE {
                     Split
@@ -321,7 +449,6 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> NodeInternal<K, V>
                     UpdateLeft(self.keys[self.used-2].clone())
                 } else {
                     NoAction
-                    //UpdateLeft(left)
                 }
             } 
         }
@@ -367,4 +494,10 @@ impl<K: Zero+Clone+Ord+Eq, V: Zero+Clone> NodeInternal<K, V>
         (right, key)
     }
 
+    fn freeze_children(&mut self)
+    {
+        for i in range(0, self.used) {
+            self.children[i].freeze();
+        }
+    }
 }

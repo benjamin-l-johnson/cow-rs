@@ -305,6 +305,129 @@ fn insert_and_fetch_shuffle_20K()
     }
 }
 
+#[test]
+fn freeze()
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    for i in range(0, 1100) {
+        btree.set(&i, &i);
+        for j in range(0, i+1) {
+            check(&btree, j, j);
+        }
+    }
+
+    for i in range(0, 1100) {
+        check(&btree, i, i);
+    }
+
+    btree.freeze();
+
+    for i in range(0, 1100) {
+        check(&btree, i, i);
+    }    
+}
+
+#[test]
+fn freeze_set()
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    for i in range(0, 1100) {
+        btree.set(&i, &i);
+        for j in range(0, i+1) {
+            check(&btree, j, j);
+        }
+    }
+
+    for i in range(0, 1100) {
+        check(&btree, i, i);
+    }
+
+    btree.freeze();
+
+    for i in range(1100, 2200) {
+        btree.set(&i, &i);
+        for j in range(0, i+1) {
+            check(&btree, j, j);
+        }
+    }
+
+    for i in range(0, 2200) {
+        check(&btree, i, i);
+    } 
+}
+
+#[test]
+fn freeze_set2()
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    for i in range(0, 1100) {
+        btree.set(&i, &i);
+        for j in range(0, i+1) {
+            check(&btree, j, j);
+        }
+    }
+
+    for i in range(0, 1100) {
+        check(&btree, i, i);
+    }
+
+    btree.freeze();
+
+    let old = btree.clone();
+
+    for i in range(1100, 2200) {
+        btree.set(&i, &i);
+        for j in range(0, i+1) {
+            check(&btree, j, j);
+        }
+    }
+
+    for i in range(0, 2200) {
+        check(&btree, i, i);
+    }
+
+    for i in range(0, 1100) {
+        check(&old, i, i);
+    }
+
+    for i in range(1100, 2200) {
+        assert!(old.get(&i).is_none());
+    } 
+}
+
+#[test]
+fn freeze_tasks()
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    for i in range(0, 1100) {
+        btree.set(&i, &i);
+        for j in range(0, i+1) {
+            check(&btree, j, j);
+        }
+    }
+
+    for i in range(0, 1100) {
+        check(&btree, i, i);
+    }
+
+    btree.freeze();
+
+    for _ in range(0, 8) {
+        let old = btree.clone();
+
+        do std::task::spawn {
+            for i in range(0, 1100) {
+                check(&old, i, i);
+            }
+        }
+    }
+
+}
+
 #[bench]
 fn btree_bench_insert_1K(bench: &mut BenchHarness)
 {
@@ -501,6 +624,73 @@ fn hmap_bench_insert_1K(bench: &mut BenchHarness)
         let mut btree: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
         for b in build_arr.iter() {
             btree.insert(*b, *b);
+        }
+    });
+}
+
+#[bench]
+fn btree_nofreeze(bench: &mut BenchHarness)
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    for i in range(0, 25_000) {
+        btree.set(&i, &i);
+    }
+
+    bench.iter(|| {
+        let _ = btree.clone();
+    });
+}
+
+#[bench]
+fn btree_freeze(bench: &mut BenchHarness)
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    for i in range(0, 25_000) {
+        btree.set(&i, &i);
+    }
+
+    btree.freeze();
+
+    bench.iter(|| {
+        let _ = btree.clone();
+    });
+}
+
+
+#[bench]
+fn btree_freeze_set_5K(bench: &mut BenchHarness)
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    for i in range(0, 25_000) {
+        btree.set(&i, &i);
+    }
+
+    btree.freeze();
+
+    bench.iter(|| {
+        let mut new = btree.clone();
+        for i in range(25_000, 30_000) {
+            new.set(&i, &i);
+        }
+    });
+}
+
+#[bench]
+fn btree_nofreeze_set_5K(bench: &mut BenchHarness)
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    for i in range(0, 25_000) {
+        btree.set(&i, &i);
+    }
+
+    bench.iter(|| {
+        let mut new = btree.clone();
+        for i in range(25_000, 30_000) {
+            new.set(&i, &i);
         }
     });
 }
