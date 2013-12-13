@@ -7,8 +7,8 @@ use std::util;
 
 use extra::arc::Arc;
 
-static LEAF_SIZE: uint = 63;
-static INTERNAL_SIZE: uint = 32;
+static LEAF_SIZE: uint = 31;
+static INTERNAL_SIZE: uint = 16;
 
 struct NodeLeaf<K, V> {
     used:   uint,
@@ -265,6 +265,9 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> BTree<K, V>
 {
     pub fn new() -> BTree<K, V>
     {
+        println!("leaf: {} node: {}",
+                std::mem::size_of::<NodeLeaf<K, V>>(),
+                std::mem::size_of::<NodeInternal<K, V>>());
         BTree {
             root: Empty
         }
@@ -347,26 +350,14 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeLeaf<K, V>
     {
         NodeLeaf {
             used: 0,
-            keys: [
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero()
-            ],
-            values: [
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero()
-            ]
+            keys: [zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero()],
+            values: [zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                     zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                     zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                     zero(), zero(), zero(), zero(), zero(), zero(), zero()]
         }
     }
 
@@ -405,13 +396,11 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeLeaf<K, V>
     //#[inline(always)]
     fn get<'a>(&'a self, key: &K) -> Option<&'a V>
     {
-        unsafe {
         for i in range(0, self.used) {
-            if *key == self.keys.unsafe_get(i) {
+            if *key == self.keys[i] {
                 return Some(&self.values[i]);
             }
         }
-        } 
         None
     }
 
@@ -467,18 +456,11 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
     {
         NodeInternal {
             used: 2,
-            keys: [
-                key,    zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero()
-            ],
-            children: [
-                left,  right, Empty, Empty, Empty, Empty, Empty, Empty,
-                Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            ]
+            keys: [key,    zero(), zero(), zero(), zero(), zero(), zero(),zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero()]
+            ,
+            children: [left,  right, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty]
         }
     }
 
@@ -486,18 +468,10 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
     {
         NodeInternal {
             used: 0,
-            keys: [
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                zero(), zero(), zero(), zero(), zero(), zero(), zero()
-            ],
-            children: [
-                Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            ]
+            keys: [zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero()],
+            children: [Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty]
         }
     }
 
@@ -566,7 +540,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
         idx
     }
 
-    //#[inline(always)]
+    #[inline(always)]
     fn get<'a>(&'a self, key: &K) -> Option<&'a V>
     {
         self.children[self.search(key)].get(key)

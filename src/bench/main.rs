@@ -7,6 +7,7 @@ use std::rand::{Rng, IsaacRng, SeedableRng};
 use btree::BTree;
 use extra::time::precise_time_ns;
 
+use extra::arc::Arc;
 
 fn time_to_nice(time: u64) -> ~str
 {
@@ -29,12 +30,11 @@ fn main()
 
     let mut build_arr = ~[];
 
-    for i in range(0, 1_000_000) {
-        build_arr.push(i);
+    for i in range(0, 25_000) {
+        build_arr.push(i as int);
     }
 
     rng.shuffle_mut(build_arr);
-
 
     let build = precise_time_ns();
     let mut btree: BTree<int, int> = BTree::new();
@@ -42,13 +42,9 @@ fn main()
         btree.set(b, b);
     }
 
+    let build_arr = Arc::new(build_arr);
+
     let freeze = precise_time_ns();
-
-    btree.freeze();
-
-    for b in build_arr.slice(0, 10_000).iter() {
-        btree.set(b, b);
-    }
 
     btree.freeze();
 
@@ -57,14 +53,15 @@ fn main()
     let (port, chan): (std::comm::Port<()>, std::comm::Chan<()>) = std::comm::stream();
     let chan = SharedChan::new(chan);
 
-    let threads = 1_000_000_000 / 1_000_000;
+    let threads = 1_000_000_000 / 25_000;
 
     for _ in range(0, threads) {
         let btree = btree.clone();
         let chan = chan.clone();
+        let build_arr = build_arr.clone();
         do std::task::spawn {
-            for i in range(0, 1_000_000) {
-                btree.get(&i);
+            for i in build_arr.get().iter() {
+                btree.get(i);
             }
             chan.send(());
         }
