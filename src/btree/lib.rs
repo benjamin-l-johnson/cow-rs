@@ -2,9 +2,9 @@
 extern mod extra;
 
 use std::kinds::{Freeze, Send};
-use std::num::{zero, Zero};
+use std::default::{Default};
 use std::util;
-
+use std::num::{Zero, zero};
 use extra::arc::Arc;
 
 static LEAF_SIZE: uint = 31;
@@ -42,13 +42,18 @@ enum SetAction<K> {
 }
 
 pub struct BTreeStat {
-    mut_leafs: uint,
+    mut_leaves: uint,
     mut_nodes: uint,
-    immut_leafs: uint,
+    immut_leaves: uint,
     immut_nodes: uint,
     items: uint,
     unused: uint,
     depth: uint
+}
+
+fn default<T: Default>() -> T
+{
+    Default::default()
 }
 
 impl Zero for BTreeStat
@@ -56,9 +61,9 @@ impl Zero for BTreeStat
     fn zero() -> BTreeStat
     {
         BTreeStat {
-            mut_leafs: 0u,
+            mut_leaves: 0u,
             mut_nodes: 0u,
-            immut_leafs: 0u,
+            immut_leaves: 0u,
             immut_nodes: 0u,
             items: 0u,
             unused: 0u,
@@ -68,9 +73,9 @@ impl Zero for BTreeStat
 
     fn is_zero(&self) -> bool
     {
-        self.mut_leafs.is_zero() &&
+        self.mut_leaves.is_zero() &&
         self.mut_nodes.is_zero() &&
-        self.immut_leafs.is_zero() &&
+        self.immut_leaves.is_zero() &&
         self.immut_nodes.is_zero() &&
         self.items.is_zero() &&
         self.unused.is_zero()
@@ -82,9 +87,9 @@ impl Add<BTreeStat, BTreeStat> for BTreeStat
     fn add(&self, other: &BTreeStat) -> BTreeStat
     {
         BTreeStat {
-            mut_leafs: self.mut_leafs + other.mut_leafs,
+            mut_leaves: self.mut_leaves + other.mut_leaves,
             mut_nodes: self.mut_nodes + other.mut_nodes,
-            immut_leafs: self.immut_leafs + other.immut_leafs,
+            immut_leaves: self.immut_leaves + other.immut_leaves,
             immut_nodes: self.immut_nodes + other.immut_nodes,
             items: self.items + other.items,
             unused: self.unused + other.unused,
@@ -93,7 +98,7 @@ impl Add<BTreeStat, BTreeStat> for BTreeStat
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for Node<K, V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for Node<K, V>
 {
     fn clone(&self) -> Node<K, V>
     {
@@ -107,7 +112,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for Node
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Node<K, V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
 {
     //#[inline(always)]
     pub fn insert(&mut self, key: &K, value: &V) -> SetAction<K>
@@ -225,7 +230,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Node<K, V>
             },
             Leaf(ref leaf) => {
                 let mut stat = (*leaf).stat();
-                stat.mut_leafs += 1;
+                stat.mut_leaves += 1;
                 stat
             },
             Internal(ref node) => {
@@ -235,7 +240,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Node<K, V>
             },
             SharedLeaf(ref leaf) => {
                 let mut stat = (*leaf).get().stat();
-                stat.immut_leafs += 1;
+                stat.immut_leaves += 1;
                 stat
             },
             SharedInternal(ref node) => {
@@ -250,7 +255,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Node<K, V>
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for BTree<K, V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
 {
     fn clone(&self) -> BTree<K, V>
     {
@@ -260,7 +265,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for BTre
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> BTree<K, V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
 {
     pub fn new() -> BTree<K, V>
     {
@@ -351,7 +356,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> BTree<K, V>
 }
 
 
-impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
 {
     fn clone(&self) -> NodeLeaf<K, V>
     {
@@ -368,20 +373,20 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for Node
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeLeaf<K, V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
 {
     fn new() -> NodeLeaf<K, V>
     {
         NodeLeaf {
             used: 0,
-            keys: [zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero()],
-            values: [zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                     zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                     zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                     zero(), zero(), zero(), zero(), zero(), zero(), zero()]
+            keys: [default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default()],
+            values: [default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default()]
         }
     }
 
@@ -463,7 +468,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeLeaf<K, V>
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for NodeInternal<K, V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
 {
     fn clone(&self) -> NodeInternal<K, V>
     {
@@ -483,28 +488,28 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for Node
     }
 }
 
-impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K, V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInternal<K, V>
 {
     fn new(key: K, left: Node<K, V>, right: Node<K, V>) -> NodeInternal<K, V>
     {
         NodeInternal {
             used: 2,
-            keys: [key,    zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero()]
+            keys: [key,       default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default()]
             ,
             children: [left,  right, Empty, Empty, Empty, Empty, Empty, Empty,
                        Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
@@ -529,22 +534,22 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
     {
         NodeInternal {
             used: 0,
-            keys: [zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
-                   zero(), zero(), zero(), zero(), zero(), zero(), zero()],
+            keys: [default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default()],
             children: [Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
                        Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
                        Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
@@ -599,7 +604,6 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
                 }
             },
             UpdateLeft(left) => {
-                assert!(left != zero());
                 if idx != self.used {
                     self.keys[idx] = left;
                     UpdateLeft(self.keys[self.used-2].clone())
@@ -679,7 +683,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
         right.used = self.used - INTERNAL_SIZE / 2;
         self.used =  INTERNAL_SIZE / 2;
 
-        let mut key: K = zero();
+        let mut key: K = default();
         util::swap(&mut key, &mut self.keys[self.used-1]);
 
         (right, key)
