@@ -30,7 +30,7 @@ fn main()
 
     let mut build_arr = ~[];
 
-    for i in range(0, 25_000) {
+    for i in range(0, 10_000) {
         build_arr.push(i as int);
     }
 
@@ -38,8 +38,9 @@ fn main()
 
     let build = precise_time_ns();
     let mut btree: BTree<int, int> = BTree::new();
-    for b in build_arr.iter() {
-        btree.set(b, b);
+
+    for &b in build_arr.iter() {
+        btree.insert(b, b);
     }
 
     let build_arr = Arc::new(build_arr);
@@ -53,7 +54,7 @@ fn main()
     let (port, chan): (std::comm::Port<()>, std::comm::Chan<()>) = std::comm::stream();
     let chan = SharedChan::new(chan);
 
-    let threads = 1_000_000_000 / 25_000;
+    let threads = 1_000_000_000 / 10_000;
 
     for _ in range(0, threads) {
         let btree = btree.clone();
@@ -79,6 +80,4 @@ fn main()
     println!("freeze: {}", time_to_nice(done_freeze - freeze));
     println!("send: {} {:2.2}ns/get", time_to_nice(done_search - done_freeze), (done_search - done_freeze) as f64 / 1_000_000_000.);
     println!("stat: {:?}", btree.stat());
-
-
 }

@@ -110,18 +110,18 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Clone for Node
 impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> Node<K, V>
 {
     //#[inline(always)]
-    pub fn set(&mut self, key: &K, value: &V) -> SetAction<K>
+    pub fn insert(&mut self, key: &K, value: &V) -> SetAction<K>
     {
         match *self {
             Empty => {
                 *self = Leaf(~NodeLeaf::new());
-                self.set(key, value)
+                self.insert(key, value)
             },
             Leaf(ref mut leaf) => {
-                (*leaf).set(key, value)
+                (*leaf).insert(key, value)
             },
             Internal(ref mut node) => {
-                (*node).set(key, value)
+                (*node).insert(key, value)
             },
             SharedLeaf(_) => {
                 Unfreeze
@@ -269,9 +269,9 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> BTree<K, V>
         }
     }
 
-    pub fn set(&mut self, key: &K, value: &V) -> bool
+    pub fn insert(&mut self, key: K, value: V) -> bool
     {
-        match self.root.set(key, value) {
+        match self.root.insert(&key, &value) {
             Done(update) => update,
             // if the left key is only updated
             // on an insert, not an update so this
@@ -279,7 +279,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> BTree<K, V>
             UpdateLeft(_) => false,
             Unfreeze => {
                 self.root.unfreeze();
-                self.set(key, value)
+                self.insert(key, value)
             }
             Split => {
                 let (split_key, right) = match self.root {
@@ -299,7 +299,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> BTree<K, V>
                 util::swap(&mut self.root, &mut left);
 
                 self.root = Internal(~NodeInternal::new(split_key, left, right));
-                self.set(key, value)
+                self.insert(key, value)
             }
         }
     }
@@ -386,7 +386,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeLeaf<K, V>
     }
 
     //#[inline(always)]
-    fn set(&mut self, key: &K, value: &V) -> SetAction<K>
+    fn insert(&mut self, key: &K, value: &V) -> SetAction<K>
     {
         if self.used == LEAF_SIZE {
             Split
@@ -509,15 +509,15 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
     }
 
     //#[inline(always)]
-    fn set(&mut self, key: &K, value: &V) -> SetAction<K>
+    fn insert(&mut self, key: &K, value: &V) -> SetAction<K>
     {
         let idx = self.search(key);
 
-        match self.children[idx].set(key, value) {
+        match self.children[idx].insert(key, value) {
             Done(bool) => (Done(bool)),
             Unfreeze => {
                 self.children[idx].unfreeze();
-                self.set(key, value)
+                self.insert(key, value)
             }
             Split => {
                 if self.used == INTERNAL_SIZE {
@@ -539,7 +539,7 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
                     }
 
                     self.used += 1;
-                    self.set(key, value)
+                    self.insert(key, value)
                 }
             },
             UpdateLeft(left) => {
