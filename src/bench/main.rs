@@ -30,7 +30,7 @@ fn main()
 
     let mut build_arr = ~[];
 
-    for i in range(0, 10_000) {
+    for i in range(0, 25_000) {
         build_arr.push(i as int);
     }
 
@@ -54,7 +54,7 @@ fn main()
     let (port, chan): (std::comm::Port<()>, std::comm::Chan<()>) = std::comm::stream();
     let chan = SharedChan::new(chan);
 
-    let threads = 1_000_000_000 / 10_000;
+    let threads = 1_000_000_000 / 25_000;
 
     for _ in range(0, threads) {
         let btree = btree.clone();

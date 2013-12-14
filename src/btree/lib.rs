@@ -8,7 +8,7 @@ use std::util;
 use extra::arc::Arc;
 
 static LEAF_SIZE: uint = 31;
-static INTERNAL_SIZE: uint = 16;
+static INTERNAL_SIZE: uint = 128;
 
 struct NodeLeaf<K, V> {
     used:   uint,
@@ -489,10 +489,38 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
     {
         NodeInternal {
             used: 2,
-            keys: [key,    zero(), zero(), zero(), zero(), zero(), zero(),zero(),
+            keys: [key,    zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
                    zero(), zero(), zero(), zero(), zero(), zero(), zero()]
             ,
             children: [left,  right, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
                        Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty]
         }
     }
@@ -502,8 +530,36 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
         NodeInternal {
             used: 0,
             keys: [zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
+                   zero(), zero(), zero(), zero(), zero(), zero(), zero(), zero(),
                    zero(), zero(), zero(), zero(), zero(), zero(), zero()],
             children: [Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
                        Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty]
         }
     }
@@ -554,8 +610,8 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
         }
     }
 
-    #[inline(always)]
-    fn search(&self, key: &K) -> uint
+    #[inline(never)]
+    fn search_linear(&self, key: &K) -> uint
     {
         let mut idx = 0;
         unsafe {
@@ -567,6 +623,39 @@ impl<K: Zero+Clone+Ord+Eq+Send+Freeze, V: Zero+Clone+Send+Freeze> NodeInternal<K
             }
         }
         idx
+    }
+
+    #[inline(never)]
+    fn search_bsec(&self, key: &K) -> uint
+    {
+        let mut start = 0u;
+        let mut end = self.used-2;
+
+        while end > start {
+            let mid = start + ((end-start) / 2);
+
+            if *key > self.keys[mid] {
+                start = mid+1;
+            } else {
+                end = mid;
+            }
+        }
+
+        if self.used - 2 == start && *key > self.keys[start] {
+            start + 1
+        } else {
+            start
+        }
+    }
+
+    #[inline(always)]
+    fn search(&self, key: &K) -> uint
+    {
+        if self.used < 9 {
+            self.search_linear(key)
+        } else {
+            self.search_bsec(key)
+        }
     }
 
     #[inline(always)]
