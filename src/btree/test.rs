@@ -12,7 +12,7 @@ fn check(btree: &BTree<int, int>, key: int, expected: int)
     match btree.get(&key) {
         Some(val) => {
             if *val != expected {
-                fail!("{:?} != {:?}", val, expected);
+                fail!("{:?} != {:?} {:?}", *val, expected, btree);
             }
         },
         None => {
@@ -20,7 +20,6 @@ fn check(btree: &BTree<int, int>, key: int, expected: int)
         }
     }
 }
-
 
 #[test]
 fn insert_and_fetch_10()
@@ -306,6 +305,39 @@ fn insert_and_fetch_shuffle_20K()
 }
 
 #[test]
+fn update_shuffle_1100()
+{
+    let mut btree: BTree<int, int> = BTree::new();
+
+    let mut rng = IsaacRng::new();
+    rng.reseed([60387u32]);
+
+    let mut build_arr = ~[];
+
+    for i in range(0, 100) {
+        build_arr.push(i);
+    }
+
+    rng.shuffle_mut(build_arr);
+
+    for b in build_arr.iter() {
+        assert!(btree.set(b, b) == false);
+    }
+
+    for i in range(0, 100) {
+        check(&btree, i, i);
+    }
+
+    for &b in build_arr.iter() {
+        assert!(btree.set(&b, &(b+100)) == true);
+    }
+
+    for i in range(0, 100) {
+        check(&btree, i, i+100);
+    }
+}
+
+#[test]
 fn freeze()
 {
     let mut btree: BTree<int, int> = BTree::new();
@@ -429,7 +461,7 @@ fn freeze_tasks()
 }
 
 #[bench]
-fn btree_bench_insert_1K(bench: &mut BenchHarness)
+fn btree_bench_insert_1K_shuffle(bench: &mut BenchHarness)
 {
     let mut rng = IsaacRng::new();
     rng.reseed([60387u32]);
@@ -450,6 +482,98 @@ fn btree_bench_insert_1K(bench: &mut BenchHarness)
     });
 }
 
+#[bench]
+fn btree_bench_insert_1K_linear(bench: &mut BenchHarness)
+{
+    bench.iter(|| {
+        let mut btree: BTree<int, int> = BTree::new();
+        for b in range(0, 1_000) {
+            btree.set(&b, &b);
+        }
+    });
+}
+
+#[bench]
+fn btree_bench_update_1K_shuffle(bench: &mut BenchHarness)
+{
+    let mut rng = IsaacRng::new();
+    rng.reseed([60387u32]);
+
+    let mut build_arr = ~[];
+
+    for i in range(0, 1_000) {
+        build_arr.push(i);
+    }
+
+    rng.shuffle_mut(build_arr);
+
+    let mut btree: BTree<int, int> = BTree::new();
+    for b in build_arr.iter() {
+        btree.set(b, b);
+    }
+
+    bench.iter(|| {
+        for b in build_arr.iter() {
+            btree.set(b, b);
+        }
+    });
+}
+
+#[bench]
+fn btree_bench_update_1K_linear(bench: &mut BenchHarness)
+{
+    let mut btree: BTree<int, int> = BTree::new();
+    for b in range(0, 1_000) {
+        btree.set(&b, &b);
+    }
+
+    bench.iter(|| {
+        for b in range(0, 1_000) {
+            btree.set(&b, &b);
+        }
+    });
+}
+
+#[bench]
+fn hmap_bench_update_1K_shuffle(bench: &mut BenchHarness)
+{
+    let mut rng = IsaacRng::new();
+    rng.reseed([60387u32]);
+
+    let mut build_arr = ~[];
+
+    for i in range(0, 1_000) {
+        build_arr.push(i);
+    }
+
+    rng.shuffle_mut(build_arr);
+
+    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
+    for &b in build_arr.iter() {
+        hmap.insert(b, b);
+    }
+
+    bench.iter(|| {
+        for &b in build_arr.iter() {
+            hmap.insert(b, b);
+        }
+    });
+}
+
+#[bench]
+fn hmap_bench_update_1K_linear(bench: &mut BenchHarness)
+{
+    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
+    for b in range(0, 1_000) {
+        hmap.insert(b, b);
+    }
+
+    bench.iter(|| {
+        for b in range(0, 1_000) {
+            hmap.insert(b, b);
+        }
+    });
+}
 
 #[bench]
 fn btree_bench_get_1K(bench: &mut BenchHarness)
@@ -479,76 +603,88 @@ fn btree_bench_get_1K(bench: &mut BenchHarness)
 
 
 #[bench]
-fn btree_bench_get_5K(bench: &mut BenchHarness)
+fn btree_bench_shuffle_100K_get_1K(bench: &mut BenchHarness)
 {
     let mut rng = IsaacRng::new();
     rng.reseed([60387u32]);
 
     let mut build_arr = ~[];
 
-    for i in range(0, 5_000) {
+    for i in range(0, 100_000) {
         build_arr.push(i);
     }
 
     rng.shuffle_mut(build_arr);
 
     let mut btree: BTree<int, int> = BTree::new();
+
     for b in build_arr.iter() {
         btree.set(b, b);
     }
 
     bench.iter(|| {
-        for b in build_arr.iter() {
+        for b in build_arr.slice(0, 1_000).iter() {
             btree.get(b);
         }
     });
 }
 
 #[bench]
-fn btree_bench_linear_5K(bench: &mut BenchHarness)
+fn hmap_bench_shuffle_100K_get_1K(bench: &mut BenchHarness)
+{
+    let mut rng = IsaacRng::new();
+    rng.reseed([60387u32]);
+
+    let mut build_arr = ~[];
+
+    for i in range(0, 100_000) {
+        build_arr.push(i);
+    }
+
+    rng.shuffle_mut(build_arr);
+
+    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
+
+    for &b in build_arr.iter() {
+        hmap.insert(b, b);
+    }
+
+    bench.iter(|| {
+        for b in build_arr.slice(0, 1_000).iter() {
+            hmap.get(b);
+        }
+    });
+}
+
+#[bench]
+fn btree_bench_linear_100K_get_1K(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
-    for i in range(0, 10_000) {
+    for i in range(0, 100_000) {
         btree.set(&i, &i);
     }
 
     bench.iter(|| {
-        for i in range(0, 5_000) {
+        for i in range(0, 1_000) {
             btree.get(&i);
         }
     });
 }
 
+
 #[bench]
-fn hmap_bench_linear_5K(bench: &mut BenchHarness)
+fn hmap_bench_linear_100K_get_1K(bench: &mut BenchHarness)
 {
     let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
 
-    for i in range(0, 10_000) {
+    for i in range(0, 100_000) {
         hmap.insert(i, i);
     }
 
     bench.iter(|| {
-        for i in range(0, 5_000) {
+        for i in range(0, 1_000) {
             hmap.get(&i);
-        }
-    });
-}
-
-
-#[bench]
-fn table_bench_linear_5K(bench: &mut BenchHarness)
-{
-    let mut table: ~[(int, Option<int>)] = ~[];
-
-    for i in range(0, 10_000) {
-        table.push((i, Some(i)));
-    }
-
-    bench.iter(|| {
-        for i in range(0, 5_000) {
-            table.bsearch(|&(k, _)| {i.cmp(&k)});
         }
     });
 }
@@ -562,32 +698,6 @@ fn hmap_bench_get_1K(bench: &mut BenchHarness)
     let mut build_arr = ~[];
 
     for i in range(0, 1_000) {
-        build_arr.push(i);
-    }
-
-    rng.shuffle_mut(build_arr);
-
-    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
-    for b in build_arr.iter() {
-        hmap.insert(*b, *b);
-    }
-
-    bench.iter(|| {
-        for b in build_arr.iter() {
-            hmap.get(b);
-        }
-    });
-}
-
-#[bench]
-fn hmap_bench_get_5K(bench: &mut BenchHarness)
-{
-    let mut rng = IsaacRng::new();
-    rng.reseed([60387u32]);
-
-    let mut build_arr = ~[];
-
-    for i in range(0, 5_000) {
         build_arr.push(i);
     }
 
@@ -629,7 +739,7 @@ fn hmap_bench_insert_1K(bench: &mut BenchHarness)
 }
 
 #[bench]
-fn btree_nofreeze(bench: &mut BenchHarness)
+fn btree_clone_nofreeze(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
@@ -643,7 +753,7 @@ fn btree_nofreeze(bench: &mut BenchHarness)
 }
 
 #[bench]
-fn btree_freeze(bench: &mut BenchHarness)
+fn btree_clone_freeze(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
@@ -658,9 +768,8 @@ fn btree_freeze(bench: &mut BenchHarness)
     });
 }
 
-
 #[bench]
-fn btree_freeze_set_5K(bench: &mut BenchHarness)
+fn btree_clone_freeze_set_1K(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
@@ -672,14 +781,14 @@ fn btree_freeze_set_5K(bench: &mut BenchHarness)
 
     bench.iter(|| {
         let mut new = btree.clone();
-        for i in range(25_000, 30_000) {
+        for i in range(0, 1_000) {
             new.set(&i, &i);
         }
     });
 }
 
 #[bench]
-fn btree_nofreeze_set_5K(bench: &mut BenchHarness)
+fn btree_clone_nofreeze_set_1K(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
@@ -689,8 +798,9 @@ fn btree_nofreeze_set_5K(bench: &mut BenchHarness)
 
     bench.iter(|| {
         let mut new = btree.clone();
-        for i in range(25_000, 30_000) {
+        for i in range(0, 1_000) {
             new.set(&i, &i);
         }
     });
 }
+
