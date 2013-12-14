@@ -743,7 +743,7 @@ fn btree_clone_nofreeze(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
-    for i in range(0, 25_000) {
+    for i in range(0, 5_000) {
         btree.set(&i, &i);
     }
 
@@ -757,7 +757,7 @@ fn btree_clone_freeze(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
-    for i in range(0, 25_000) {
+    for i in range(0, 5_000) {
         btree.set(&i, &i);
     }
 
@@ -769,11 +769,25 @@ fn btree_clone_freeze(bench: &mut BenchHarness)
 }
 
 #[bench]
+fn hmap_clone(bench: &mut BenchHarness)
+{
+    let mut btree: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
+
+    for i in range(0, 5_000) {
+        btree.insert(i, i);
+    }
+
+    bench.iter(|| {
+        let _ = btree.clone();
+    });
+}
+
+#[bench]
 fn btree_clone_freeze_set_1K(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
-    for i in range(0, 25_000) {
+    for i in range(0, 5_000) {
         btree.set(&i, &i);
     }
 
@@ -792,7 +806,7 @@ fn btree_clone_nofreeze_set_1K(bench: &mut BenchHarness)
 {
     let mut btree: BTree<int, int> = BTree::new();
 
-    for i in range(0, 25_000) {
+    for i in range(0, 5_000) {
         btree.set(&i, &i);
     }
 
@@ -803,4 +817,5 @@ fn btree_clone_nofreeze_set_1K(bench: &mut BenchHarness)
         }
     });
 }
+
 
