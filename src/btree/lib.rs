@@ -34,11 +34,17 @@ pub struct BTree<K, V> {
     root: Node<K, V>
 }
 
-enum SetAction<K> {
-    Done(bool),
+enum InsertAction<K> {
+    InsertDone(bool),
     Split,
-    UpdateLeft(K),
-    Unfreeze
+    InsertUpdateLeft(K),
+    InsertUnfreeze
+}
+
+enum RemoveAction<K> {
+    RemoveDone(bool, bool),
+    RemoveUpdateLeft(K),
+    RemoveUnfreeze
 }
 
 pub struct BTreeStat {
@@ -114,8 +120,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone fo
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
 {
-    //#[inline(always)]
-    pub fn insert(&mut self, key: &K, value: &V) -> SetAction<K>
+    pub fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         match *self {
             Empty => {
@@ -129,15 +134,35 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
                 (*node).insert(key, value)
             },
             SharedLeaf(_) => {
-                Unfreeze
+                InsertUnfreeze
             },
             SharedInternal(_) => {
-                Unfreeze
+                InsertUnfreeze
             },
         }
     }
 
-    //#[inline(always)]
+    pub fn remove(&mut self, key: &K) -> RemoveAction<K>
+    {
+        match *self {
+            Empty => {
+                RemoveDone(false, false)
+            },
+            Leaf(ref mut leaf) => {
+                (*leaf).remove(key)
+            },
+            Internal(ref mut node) => {
+                (*node).remove(key)
+            },
+            SharedLeaf(_) => {
+                RemoveUnfreeze
+            },
+            SharedInternal(_) => {
+                RemoveUnfreeze
+            },
+        }        
+    }
+
     pub fn get<'a>(&'a self, key: &K) -> Option<&'a V>
     {
         match *self {
@@ -159,7 +184,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         }
     }
 
-    //#[inline(always)]
     pub fn split(&mut self) -> (Node<K, V>, K)
     {
         match *self {
@@ -177,7 +201,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         }
     }
 
-    //#[inline(always)]
     pub fn freeze(&mut self)
     {
         match *self {
@@ -200,7 +223,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         };
     }
 
-    //#[inline(always)]
     pub fn unfreeze(&mut self)
     {
         match *self {
@@ -277,12 +299,12 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
     pub fn insert(&mut self, key: K, value: V) -> bool
     {
         match self.root.insert(&key, &value) {
-            Done(update) => update,
+            InsertDone(update) => update,
             // if the left key is only updated
             // on an insert, not an update so this
             // can return false
-            UpdateLeft(_) => false,
-            Unfreeze => {
+            InsertUpdateLeft(_) => false,
+            InsertUnfreeze => {
                 self.root.unfreeze();
                 self.insert(key, value)
             }
@@ -306,6 +328,14 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
                 self.root = Internal(~NodeInternal::new(split_key, left, right));
                 self.insert(key, value)
             }
+        }
+    }
+
+    pub fn remove(&mut self, key: &K) -> bool
+    {
+        match self.root.remove(key) {
+            RemoveDone(found, _) => found,
+            _ => fail!("not supported")
         }
     }
 
@@ -338,6 +368,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
 
         target_leaf.unwrap().get(key)
     }
+
 
     pub fn freeze(&mut self)
     {
@@ -390,8 +421,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
         }
     }
 
-    //#[inline(always)]
-    fn insert(&mut self, key: &K, value: &V) -> SetAction<K>
+    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         if self.used == LEAF_SIZE {
             Split
@@ -407,7 +437,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
             // update
             if insert != self.used && *key == self.keys[insert] {
                 self.values[insert] = (*value).clone();
-                Done(true)
+                InsertDone(true)
             // insert
             } else {
                 let mut key = (*key).clone();
@@ -421,25 +451,54 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
                 }
 
                 if insert == self.used {
-                    UpdateLeft(self.keys[self.used-1].clone())
+                    InsertUpdateLeft(self.keys[self.used-1].clone())
                 } else {
-                    Done(false)
+                    InsertDone(false)
                 }
             }
         }
     }
 
-    //#[inline(always)]
-    fn get<'a>(&'a self, key: &K) -> Option<&'a V>
+    fn search(&self, key: &K) -> Option<uint>
     {
-        unsafe {
-            for i in range(0, self.used) {
-                if *key == self.keys.unsafe_get(i) {
-                    return Some(&self.values[i]);
-                }
+        for i in range(0, self.used) {
+            if *key == self.keys[i] {
+                return Some(i);
             }
         }
         None
+    }
+
+    fn remove(&mut self, key: &K) -> RemoveAction<K>
+    {
+        let idx = match self.search(key) {
+            Some(idx) => idx,
+            None => return RemoveDone(false, false)
+        };
+
+        let mut key = default();
+        let mut value = default();
+
+        let offset = self.used - 1 + idx;
+        for i in range(idx, self.used) {
+            let i = offset - i;
+            util::swap(&mut self.keys[i], &mut key);
+            util::swap(&mut self.values[i], &mut value);
+        }
+
+        self.used -= 1;
+
+        RemoveDone(true, self.used < LEAF_SIZE / 2)
+    }
+
+
+
+    fn get<'a>(&'a self, key: &K) -> Option<&'a V>
+    {
+        match self.search(key) {
+            Some(idx) => Some(&self.values[idx]),
+            None => None
+        }
     }
 
     fn split(&mut self) -> (NodeLeaf<K, V>, K)
@@ -569,14 +628,13 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         }
     }
 
-    //#[inline(always)]
-    fn insert(&mut self, key: &K, value: &V) -> SetAction<K>
+    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         let idx = self.search(key);
 
         match self.children[idx].insert(key, value) {
-            Done(bool) => (Done(bool)),
-            Unfreeze => {
+            InsertDone(bool) => (InsertDone(bool)),
+            InsertUnfreeze => {
                 self.children[idx].unfreeze();
                 self.insert(key, value)
             }
@@ -603,33 +661,34 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
                     self.insert(key, value)
                 }
             },
-            UpdateLeft(left) => {
+            InsertUpdateLeft(left) => {
                 if idx != self.used {
                     self.keys[idx] = left;
-                    UpdateLeft(self.keys[self.used-2].clone())
+                    InsertUpdateLeft(self.keys[self.used-2].clone())
                 } else {
-                    Done(false)
+                    InsertDone(false)
                 }
             } 
         }
     }
 
-    #[inline(never)]
+    fn remove(&mut self, key: &K) -> RemoveAction<K>
+    {
+        self.children[self.search(key)].remove(key)
+    }
+
     fn search_linear(&self, key: &K) -> uint
     {
         let mut idx = 0;
-        unsafe {
-            while idx < (self.used-1) {
-                if *key <= self.keys.unsafe_get(idx) {
-                    break;
-                }
-                idx += 1;
+        while idx < (self.used-1) {
+            if *key <= self.keys[idx] {
+                break;
             }
+            idx += 1;
         }
         idx
     }
 
-    #[inline(never)]
     fn search_bsec(&self, key: &K) -> uint
     {
         let mut start = 0u;
@@ -652,17 +711,15 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         }
     }
 
-    #[inline(always)]
     fn search(&self, key: &K) -> uint
     {
-        if self.used < 9 {
+        if self.used < 16 {
             self.search_linear(key)
         } else {
             self.search_bsec(key)
         }
     }
 
-    #[inline(always)]
     fn get<'a>(&'a self, key: &K) -> Option<&'a V>
     {
         self.children[self.search(key)].get(key)
