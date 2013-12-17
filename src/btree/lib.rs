@@ -404,149 +404,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone fo
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
-{
-    fn new() -> NodeLeaf<K, V>
-    {
-        NodeLeaf {
-            used: 0,
-            keys: [default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default()],
-            values: [default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default()]
-        }
-    }
-
-    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
-    {
-        if self.used == LEAF_SIZE {
-            Split
-        } else {
-            let mut insert = 0;
-            while insert < self.used {
-                if *key <= self.keys[insert] {
-                    break;
-                }
-                insert += 1;
-            }
-
-            // update
-            if insert != self.used && *key == self.keys[insert] {
-                self.values[insert] = (*value).clone();
-                InsertDone(true)
-            // insert
-            } else {
-                let mut key = (*key).clone();
-                let mut value = (*value).clone();
-
-                self.used += 1;
-
-                for j in range(insert, self.used) {
-                    util::swap(&mut self.keys[j], &mut key);
-                    util::swap(&mut self.values[j], &mut value);
-                }
-
-                if insert == self.used {
-                    InsertUpdateLeft(self.keys[self.used-1].clone())
-                } else {
-                    InsertDone(false)
-                }
-            }
-        }
-    }
-
-    fn search(&self, key: &K) -> Option<uint>
-    {
-        for i in range(0, self.used) {
-            if *key == self.keys[i] {
-                return Some(i);
-            }
-        }
-        None
-    }
-
-    fn remove(&mut self, key: &K) -> RemoveAction<K>
-    {
-        let idx = match self.search(key) {
-            Some(idx) => idx,
-            None => return RemoveDone(false, false)
-        };
-
-        let mut key = default();
-        let mut value = default();
-
-        let offset = self.used - 1 + idx;
-        for i in range(idx, self.used) {
-            let i = offset - i;
-            util::swap(&mut self.keys[i], &mut key);
-            util::swap(&mut self.values[i], &mut value);
-        }
-
-        self.used -= 1;
-
-        RemoveDone(true, self.used < LEAF_SIZE / 2)
-    }
-
-
-
-    fn get<'a>(&'a self, key: &K) -> Option<&'a V>
-    {
-        match self.search(key) {
-            Some(idx) => Some(&self.values[idx]),
-            None => None
-        }
-    }
-
-    fn split(&mut self) -> (NodeLeaf<K, V>, K)
-    {
-        let mut right = NodeLeaf::new();
-
-        for (dst, src) in range(LEAF_SIZE / 2, self.used).enumerate() {
-            util::swap(&mut right.keys[dst], &mut self.keys[src]);
-            util::swap(&mut right.values[dst], &mut self.values[src]);
-        }
-
-        right.used = self.used - LEAF_SIZE / 2;
-        self.used =  LEAF_SIZE / 2;
-
-        (right, self.keys[self.used-1].clone())
-    }
-
-    fn stat(&self) -> BTreeStat
-    {
-        let mut stat: BTreeStat = zero();
-
-        stat.items = self.used;
-        stat.unused = LEAF_SIZE - self.used;
-
-        stat
-    }
-}
-
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
-{
-    fn clone(&self) -> NodeInternal<K, V>
-    {
-        let mut new = NodeInternal::new_empty();
-
-        for i in range(0, self.used) {
-            new.children[i] = self.children[i].clone();
-        }
-
-        for i in range(0, self.used-1) {
-            new.keys[i] = self.keys[i].clone();
-        }
-
-        new.used = self.used;
-
-        new
-    }
-}
-
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInternal<K, V>
 {
     fn new(key: K, left: Node<K, V>, right: Node<K, V>) -> NodeInternal<K, V>
@@ -762,3 +619,147 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         stat
     }
 }
+
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
+{
+    fn new() -> NodeLeaf<K, V>
+    {
+        NodeLeaf {
+            used: 0,
+            keys: [default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default()],
+            values: [default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default()]
+        }
+    }
+
+    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
+    {
+        if self.used == LEAF_SIZE {
+            Split
+        } else {
+            let mut insert = 0;
+            while insert < self.used {
+                if *key <= self.keys[insert] {
+                    break;
+                }
+                insert += 1;
+            }
+
+            // update
+            if insert != self.used && *key == self.keys[insert] {
+                self.values[insert] = (*value).clone();
+                InsertDone(true)
+            // insert
+            } else {
+                let mut key = (*key).clone();
+                let mut value = (*value).clone();
+
+                self.used += 1;
+
+                for j in range(insert, self.used) {
+                    util::swap(&mut self.keys[j], &mut key);
+                    util::swap(&mut self.values[j], &mut value);
+                }
+
+                if insert == self.used {
+                    InsertUpdateLeft(self.keys[self.used-1].clone())
+                } else {
+                    InsertDone(false)
+                }
+            }
+        }
+    }
+
+    fn search(&self, key: &K) -> Option<uint>
+    {
+        for i in range(0, self.used) {
+            if *key == self.keys[i] {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    fn remove(&mut self, key: &K) -> RemoveAction<K>
+    {
+        let idx = match self.search(key) {
+            Some(idx) => idx,
+            None => return RemoveDone(false, false)
+        };
+
+        let mut key = default();
+        let mut value = default();
+
+        let offset = self.used - 1 + idx;
+        for i in range(idx, self.used) {
+            let i = offset - i;
+            util::swap(&mut self.keys[i], &mut key);
+            util::swap(&mut self.values[i], &mut value);
+        }
+
+        self.used -= 1;
+
+        RemoveDone(true, self.used < LEAF_SIZE / 2)
+    }
+
+
+
+    fn get<'a>(&'a self, key: &K) -> Option<&'a V>
+    {
+        match self.search(key) {
+            Some(idx) => Some(&self.values[idx]),
+            None => None
+        }
+    }
+
+    fn split(&mut self) -> (NodeLeaf<K, V>, K)
+    {
+        let mut right = NodeLeaf::new();
+
+        for (dst, src) in range(LEAF_SIZE / 2, self.used).enumerate() {
+            util::swap(&mut right.keys[dst], &mut self.keys[src]);
+            util::swap(&mut right.values[dst], &mut self.values[src]);
+        }
+
+        right.used = self.used - LEAF_SIZE / 2;
+        self.used =  LEAF_SIZE / 2;
+
+        (right, self.keys[self.used-1].clone())
+    }
+
+    fn stat(&self) -> BTreeStat
+    {
+        let mut stat: BTreeStat = zero();
+
+        stat.items = self.used;
+        stat.unused = LEAF_SIZE - self.used;
+
+        stat
+    }
+}
+
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
+{
+    fn clone(&self) -> NodeInternal<K, V>
+    {
+        let mut new = NodeInternal::new_empty();
+
+        for i in range(0, self.used) {
+            new.children[i] = self.children[i].clone();
+        }
+
+        for i in range(0, self.used-1) {
+            new.keys[i] = self.keys[i].clone();
+        }
+
+        new.used = self.used;
+
+        new
+    }
+}
+
