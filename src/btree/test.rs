@@ -297,9 +297,6 @@ fn freeze()
 
     for i in range(0, 1100) {
         btree.insert(i, i);
-        for j in range(0, i+1) {
-            check(&btree, j, j);
-        }
     }
 
     for i in range(0, 1100) {
@@ -320,9 +317,6 @@ fn freeze_set()
 
     for i in range(0, 1100) {
         btree.insert(i, i);
-        for j in range(0, i+1) {
-            check(&btree, j, j);
-        }
     }
 
     for i in range(0, 1100) {
@@ -350,9 +344,6 @@ fn freeze_set2()
 
     for i in range(0, 1100) {
         btree.insert(i, i);
-        for j in range(0, i+1) {
-            check(&btree, j, j);
-        }
     }
 
     for i in range(0, 1100) {
@@ -390,9 +381,6 @@ fn freeze_tasks()
 
     for i in range(0, 1100) {
         btree.insert(i, i);
-        for j in range(0, i+1) {
-            check(&btree, j, j);
-        }
     }
 
     for i in range(0, 1100) {
