@@ -256,6 +256,27 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         stat.depth += 1;
         stat
     }
+
+    fn len(&self) -> uint
+    {
+        match *self {
+            Empty => {
+                zero()
+            },
+            Leaf(ref leaf) => {
+                leaf.len()
+            },
+            Internal(ref node) => {
+                node.len()
+            },
+            SharedLeaf(ref leaf) => {
+                leaf.get().len()
+            },
+            SharedInternal(ref node) => {
+                node.get().len()
+            },
+        }     
+    }
 }
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
@@ -594,6 +615,15 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         }
         stat
     }
+
+    fn len(&self) -> uint
+    {
+        let mut len = 0;
+        for i in range(0, self.used+1) {
+            len += self.children[i].len();
+        }
+        len
+    }
 }
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
@@ -717,6 +747,11 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
 
         stat
     }
+
+    fn len(&self) -> uint
+    {
+        return self.used;
+    }
 }
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
@@ -739,3 +774,9 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone fo
     }
 }
 
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Container for BTree<K, V> {
+    fn len(&self) -> uint
+    {
+        self.root.len()
+    }
+}

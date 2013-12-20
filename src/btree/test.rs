@@ -49,6 +49,7 @@ fn insert_and_fetch_10()
     for i in range(0, 10) {
         check(&btree, i, i);
     }
+    assert!(10 == btree.len());
 }
 
 #[test]
@@ -63,6 +64,7 @@ fn insert_and_fetch_80()
     for i in range(0, 80) {
         check(&btree, i, i);
     }
+    assert!(80 == btree.len());
 }
 
 #[test]
@@ -77,6 +79,7 @@ fn insert_and_fetch_120()
     for i in range(0, 120) {
         check(&btree, i, i);
     }
+    assert!(120 == btree.len());
 }
 
 #[test]
@@ -91,6 +94,7 @@ fn insert_and_fetch_990()
     for i in range(0, 990) {
         check(&btree, i, i);
     }
+    assert!(990 == btree.len());
 }
 
 
@@ -109,6 +113,7 @@ fn insert_and_fetch_1100()
     for i in range(0, 1100) {
         check(&btree, i, i);
     }
+    assert!(1100 == btree.len());
 }
 
 #[test]
@@ -123,6 +128,7 @@ fn insert_and_fetch_5K()
     for i in range(0, 5_000) {
         check(&btree, i, i);
     }
+    assert!(5_000 == btree.len());
 }
 
 #[test]
@@ -137,6 +143,7 @@ fn insert_and_fetch_20K()
     for i in range(0, 20_000) {
         check(&btree, i, i);
     }
+    assert!(20_000 == btree.len());
 }
 
 #[test]
@@ -159,6 +166,7 @@ fn insert_and_fetch_shuffle_10()
     for i in range(0, 10) {
         check(&btree, i, i);
     }
+    assert!(10 == btree.len());
 }
 
 
@@ -182,6 +190,7 @@ fn insert_and_fetch_shuffle_80()
     for i in range(0, 80) {
         check(&btree, i, i);
     }
+    assert!(80 == btree.len());
 }
 
 #[test]
@@ -198,6 +207,7 @@ fn insert_and_fetch_shuffle_120()
     for i in range(0, 120) {
         check(&btree, i, i);
     }
+    assert!(120 == btree.len());
 }
 
 
@@ -215,6 +225,7 @@ fn insert_and_fetch_shuffle_990()
     for i in range(0, 990) {
         check(&btree, i, i);
     }
+    assert!(990 == btree.len());
 }
 
 
@@ -232,6 +243,7 @@ fn insert_and_fetch_shuffle_1100()
     for i in range(0, 1_100) {
         check(&btree, i, i);
     }
+    assert!(1100 == btree.len());
 }
 
 #[test]
@@ -248,6 +260,7 @@ fn insert_and_fetch_shuffle_5K()
     for i in range(0, 5_000) {
         check(&btree, i, i);
     }
+    assert!(5_000 == btree.len());
 }
 
 #[test]
@@ -264,6 +277,7 @@ fn insert_and_fetch_shuffle_20K()
     for i in range(0, 20_000) {
         check(&btree, i, i);
     }
+    assert!(20_000 == btree.len());
 }
 
 #[test]
@@ -288,6 +302,7 @@ fn update_shuffle_1100()
     for i in range(0, 1_100) {
         check(&btree, i, i+100);
     }
+    assert!(1100 == btree.len());
 }
 
 #[test]
@@ -421,6 +436,7 @@ fn remove_test_10()
         assert!(btree.get(&i).is_none());
         assert!(btree.remove(&i) == false);
     }
+    assert!(0 == btree.len())
 }
 
 #[test]
@@ -444,6 +460,7 @@ fn remove_test_100()
         assert!(btree.get(&i).is_none());
         assert!(btree.remove(&i) == false);
     }
+    assert!(0 == btree.len())
 }
 
 #[test]
@@ -467,6 +484,7 @@ fn remove_test_1K()
         assert!(btree.get(&i).is_none());
         assert!(btree.remove(&i) == false);
     }
+    assert!(0 == btree.len());
 }
 
 #[bench]
@@ -508,6 +526,7 @@ fn btree_bench_update_1K_shuffle(bench: &mut BenchHarness)
             btree.insert(b, b);
         }
     });
+    assert!(1_000 == btree.len());
 }
 
 #[bench]
@@ -682,6 +701,7 @@ fn hmap_bench_insert_1K(bench: &mut BenchHarness)
             btree.insert(*b, *b);
         }
     });
+
 }
 
 #[bench]
@@ -744,6 +764,7 @@ fn btree_clone_freeze_set_1K(bench: &mut BenchHarness)
         for i in range(0, 1_000) {
             new.insert(i, i);
         }
+        assert!(5_000 == new.len());
     });
 }
 
@@ -761,7 +782,6 @@ fn btree_clone_nofreeze_set_1K(bench: &mut BenchHarness)
         for i in range(0, 1_000) {
             new.insert(i, i);
         }
+        assert!(5_000 == new.len());
     });
 }
-
-
