@@ -1,0 +1,10 @@
+before_install:
+  - yes | sudo add-apt-repository ppa:hansjorg/rust
+  - sudo apt-get update
+install:
+  - sudo apt-get install rust-nightly
+script:
+  - rustpkg build --opt-level=3 btree
+  - rustpkg test btree
+  - ./build/*/btree/btreetest --bench
+
