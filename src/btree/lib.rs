@@ -341,35 +341,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
         }
     }
 
-    pub fn find<'a>(&'a self, key: &K) -> Option<&'a V>
-    {
-        let mut target = &self.root;
-        let mut target_leaf: Option<&~NodeLeaf<K, V>> = None;
 
-        while target_leaf.is_none() {
-            match *target {
-                SharedInternal(ref node) => {
-                    let node = (*node).get();
-                    target = &node.children[node.search(key)];
-                },
-                Internal(ref node) => {
-                    target = &(*node).children[(*node).search(key)];
-                },
-                SharedLeaf(ref leaf) => {
-                    target_leaf = Some(leaf.get());
-                },
-                Leaf(ref leaf) => {
-                    target_leaf = Some(leaf);
-                },
-
-                Empty => {
-                    return None;
-                },
-            };
-        }
-
-        target_leaf.unwrap().find(key)
-    }
 
 
     pub fn freeze(&mut self)
@@ -778,5 +750,44 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Containe
     fn len(&self) -> uint
     {
         self.root.len()
+    }
+}
+
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V> for BTree<K, V> {
+    fn find<'a>(&'a self, key: &K) -> Option<&'a V>
+    {
+        let mut target = &self.root;
+        let mut target_leaf: Option<&~NodeLeaf<K, V>> = None;
+
+        while target_leaf.is_none() {
+            match *target {
+                SharedInternal(ref node) => {
+                    let node = (*node).get();
+                    target = &node.children[node.search(key)];
+                },
+                Internal(ref node) => {
+                    target = &(*node).children[(*node).search(key)];
+                },
+                SharedLeaf(ref leaf) => {
+                    target_leaf = Some(leaf.get());
+                },
+                Leaf(ref leaf) => {
+                    target_leaf = Some(leaf);
+                },
+
+                Empty => {
+                    return None;
+                },
+            };
+        }
+
+        target_leaf.unwrap().find(key)
+    }
+}
+
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable for BTree<K, V> {
+    fn clear(&mut self)
+    {
+        self.root = Empty;
     }
 }
