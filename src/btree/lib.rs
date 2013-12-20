@@ -1,4 +1,7 @@
 
+
+#[pkgid = "github.com/csherratt/arc-btree-rs#btree:0.1"];
+
 extern mod extra;
 
 use std::kinds::{Freeze, Send};
@@ -161,27 +164,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
                 RemoveUnfreeze
             },
         }        
-    }
-
-    pub fn get<'a>(&'a self, key: &K) -> Option<&'a V>
-    {
-        match *self {
-            Empty => {
-                None
-            },
-            Leaf(ref leaf) => {
-                (*leaf).get(key)
-            },
-            Internal(ref node) => {
-                (*node).get(key)
-            },
-            SharedLeaf(ref leaf) => {
-                (*leaf).get().get(key)
-            },
-            SharedInternal(ref node) => {
-                (*node).get().get(key)
-            },
-        }
     }
 
     pub fn split(&mut self) -> (Node<K, V>, K)
@@ -575,11 +557,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         } else {
             self.search_bsec(key)
         }
-    }
-
-    fn get<'a>(&'a self, key: &K) -> Option<&'a V>
-    {
-        self.children[self.search(key)].get(key)
     }
 
     fn split(&mut self) -> (NodeInternal<K, V>, K)
