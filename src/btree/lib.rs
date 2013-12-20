@@ -341,7 +341,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
         }
     }
 
-    pub fn get<'a>(&'a self, key: &K) -> Option<&'a V>
+    pub fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
         let mut target = &self.root;
         let mut target_leaf: Option<&~NodeLeaf<K, V>> = None;
@@ -368,7 +368,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
             };
         }
 
-        target_leaf.unwrap().get(key)
+        target_leaf.unwrap().find(key)
     }
 
 
@@ -715,7 +715,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
 
 
 
-    fn get<'a>(&'a self, key: &K) -> Option<&'a V>
+    fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
         match self.search(key) {
             Some(idx) => Some(&self.values[idx]),

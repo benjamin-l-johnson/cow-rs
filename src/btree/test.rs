@@ -8,7 +8,7 @@ use extra::test::BenchHarness;
 
 fn check(btree: &BTree<int, int>, key: int, expected: int)
 {
-    match btree.get(&key) {
+    match btree.find(&key) {
         Some(val) => {
             if *val != expected {
                 fail!("{:?} != {:?} {:?}", *val, expected, btree);
@@ -385,7 +385,7 @@ fn freeze_set2()
     }
 
     for i in range(1100, 2200) {
-        assert!(old.get(&i).is_none());
+        assert!(old.find(&i).is_none());
     } 
 }
 
@@ -431,9 +431,9 @@ fn remove_test_10()
     }
 
     for &i in build_arr.iter() {
-        assert!(btree.get(&i).is_some());
+        assert!(btree.find(&i).is_some());
         assert!(btree.remove(&i) == true);
-        assert!(btree.get(&i).is_none());
+        assert!(btree.find(&i).is_none());
         assert!(btree.remove(&i) == false);
     }
     assert!(0 == btree.len())
@@ -455,9 +455,9 @@ fn remove_test_100()
     }
 
     for &i in build_arr.iter() {
-        assert!(btree.get(&i).is_some());
+        assert!(btree.find(&i).is_some());
         assert!(btree.remove(&i) == true);
-        assert!(btree.get(&i).is_none());
+        assert!(btree.find(&i).is_none());
         assert!(btree.remove(&i) == false);
     }
     assert!(0 == btree.len())
@@ -479,9 +479,9 @@ fn remove_test_1K()
     }
 
     for &i in build_arr.iter() {
-        assert!(btree.get(&i).is_some());
+        assert!(btree.find(&i).is_some());
         assert!(btree.remove(&i) == true);
-        assert!(btree.get(&i).is_none());
+        assert!(btree.find(&i).is_none());
         assert!(btree.remove(&i) == false);
     }
     assert!(0 == btree.len());
@@ -588,7 +588,7 @@ fn btree_bench_get_1K(bench: &mut BenchHarness)
 
     bench.iter(|| {
         for b in build_arr.iter() {
-            btree.get(b);
+            btree.find(b);
         }
     });
 }
@@ -607,7 +607,7 @@ fn btree_bench_shuffle_100K_get_1K(bench: &mut BenchHarness)
 
     bench.iter(|| {
         for b in build_arr.slice(0, 1_000).iter() {
-            btree.get(b);
+            btree.find(b);
         }
     });
 }
@@ -625,7 +625,7 @@ fn hmap_bench_shuffle_100K_get_1K(bench: &mut BenchHarness)
 
     bench.iter(|| {
         for b in build_arr.slice(0, 1_000).iter() {
-            hmap.get(b);
+            hmap.find(b);
         }
     });
 }
@@ -641,7 +641,7 @@ fn btree_bench_linear_100K_get_1K(bench: &mut BenchHarness)
 
     bench.iter(|| {
         for i in range(0, 1_000) {
-            btree.get(&i);
+            btree.find(&i);
         }
     });
 }
@@ -658,7 +658,7 @@ fn hmap_bench_linear_100K_get_1K(bench: &mut BenchHarness)
 
     bench.iter(|| {
         for i in range(0, 1_000) {
-            hmap.get(&i);
+            hmap.find(&i);
         }
     });
 }
@@ -675,7 +675,7 @@ fn hmap_bench_get_1K(bench: &mut BenchHarness)
 
     bench.iter(|| {
         for b in build_arr.iter() {
-            hmap.get(b);
+            hmap.find(b);
         }
     });
 }
