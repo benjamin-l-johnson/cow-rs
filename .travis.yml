@@ -6,5 +6,4 @@ install:
 script:
   - rustpkg build --opt-level=3 btree
   - rustpkg test btree
-  - ./build/*/btree/btreetest --bench
 
