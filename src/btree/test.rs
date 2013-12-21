@@ -414,7 +414,7 @@ fn bench_update_forward_n<T: MutableMap<uint, uint>>(bench: &mut BenchHarness, l
 
     bench.iter(|| {
         for b in range(0, len) {
-            map.swap(b, b+100);
+            map.insert(b, b+100);
         }
     });
 }
@@ -429,8 +429,50 @@ fn bench_update_shuffle_n<T: MutableMap<uint, uint>>(bench: &mut BenchHarness, l
 
     bench.iter(|| {
         for b in range(0, len) {
-            map.swap(b, b+100);
+            map.insert(b, b+100);
         }
+    });
+}
+
+fn bench_get_forward_n<T: MutableMap<uint, uint>>(bench: &mut BenchHarness, len: uint, new: || -> T)
+{
+    let mut map = new();
+    for b in range(0, len) {
+        map.insert(b, b);
+    }
+
+    bench.iter(|| {
+        for b in range(0, len) {
+            map.find(&b);
+        }
+    });
+}
+
+fn bench_get_shuffle_n<T: MutableMap<uint, uint>>(bench: &mut BenchHarness, len: uint, new: || -> T)
+{
+    let build_arr = shuffled(len as uint);
+    let mut map = new();
+    for &b in build_arr.iter() {
+        map.insert(b, b);
+    }
+
+    bench.iter(|| {
+        for b in range(0, len) {
+            map.find(&b);
+        }
+    });
+}
+
+fn bench_clone_n<T: MutableMap<uint, uint>+Clone>(bench: &mut BenchHarness, len: uint, new: || -> T)
+{
+    let build_arr = shuffled(len as uint);
+    let mut map = new();
+    for &b in build_arr.iter() {
+        map.insert(b, b);
+    }
+
+    bench.iter(|| {
+        let _ = map.clone();
     });
 }
 
@@ -471,6 +513,36 @@ fn btree_update_shuffle_1_000(bench: &mut BenchHarness) {bench_update_shuffle_n(
 fn btree_update_shuffle_10_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
 
 #[bench]
+fn btree_get_forward_10(bench: &mut BenchHarness) {bench_get_forward_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_get_forward_100(bench: &mut BenchHarness) {bench_get_forward_n(bench, 100, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_get_forward_1_000(bench: &mut BenchHarness) {bench_get_forward_n(bench, 1_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_get_forward_10_000(bench: &mut BenchHarness) {bench_get_forward_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+
+#[bench]
+fn btree_get_shuffle_10(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_get_shuffle_100(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 100, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_get_shuffle_1_000(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 1_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_get_shuffle_10_000(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+
+#[bench]
+fn btree_clone_shuffle_10(bench: &mut BenchHarness) {bench_clone_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_clone_shuffle_100(bench: &mut BenchHarness) {bench_clone_n(bench, 100, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_clone_shuffle_1_000(bench: &mut BenchHarness) {bench_clone_n(bench, 1_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_clone_shuffle_10_000(bench: &mut BenchHarness) {bench_clone_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+
+
+
+
+#[bench]
 fn hmap_insert_forward_10(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
 #[bench]
 fn hmap_insert_forward_100(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
@@ -507,6 +579,36 @@ fn hmap_update_shuffle_1_000(bench: &mut BenchHarness) {bench_update_shuffle_n(b
 fn hmap_update_shuffle_10_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
 
 #[bench]
+fn hmap_get_forward_10(bench: &mut BenchHarness) {bench_get_forward_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_get_forward_100(bench: &mut BenchHarness) {bench_get_forward_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_get_forward_1_000(bench: &mut BenchHarness) {bench_get_forward_n(bench, 1_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_get_forward_10_000(bench: &mut BenchHarness) {bench_get_forward_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+
+#[bench]
+fn hmap_get_shuffle_10(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_get_shuffle_100(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_get_shuffle_1_000(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 1_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_get_shuffle_10_000(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+
+#[bench]
+fn hmap_clone_shuffle_10(bench: &mut BenchHarness) {bench_clone_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_clone_shuffle_100(bench: &mut BenchHarness) {bench_clone_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_clone_shuffle_1_000(bench: &mut BenchHarness) {bench_clone_n(bench, 1_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_clone_shuffle_10_000(bench: &mut BenchHarness) {bench_clone_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+
+
+
+
+#[bench]
 fn tris_insert_forward_10(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10, || {let out: TrieMap<uint> = TrieMap::new(); out})}
 #[bench]
 fn tris_insert_forward_100(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 100, || {let out: TrieMap<uint> = TrieMap::new(); out})}
@@ -541,3 +643,21 @@ fn tris_update_shuffle_100(bench: &mut BenchHarness) {bench_update_shuffle_n(ben
 fn tris_update_shuffle_1_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 1_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
 #[bench]
 fn tris_update_shuffle_10_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+
+#[bench]
+fn tris_get_forward_10(bench: &mut BenchHarness) {bench_get_forward_n(bench, 10, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_get_forward_100(bench: &mut BenchHarness) {bench_get_forward_n(bench, 100, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_get_forward_1_000(bench: &mut BenchHarness) {bench_get_forward_n(bench, 1_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_get_forward_10_000(bench: &mut BenchHarness) {bench_get_forward_n(bench, 10_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+
+#[bench]
+fn tris_get_shuffle_10(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 10, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_get_shuffle_100(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 100, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_get_shuffle_1_000(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 1_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_get_shuffle_10_000(bench: &mut BenchHarness) {bench_get_shuffle_n(bench, 10_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}

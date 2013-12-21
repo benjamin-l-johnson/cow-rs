@@ -849,4 +849,9 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableM
     {
         self.root.find_mut(key)
     }
+
+    fn insert(&mut self, key: K, value: V) -> bool
+    {
+        self.insert(key, value)
+    }
 }
