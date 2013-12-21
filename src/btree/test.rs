@@ -6,7 +6,11 @@ use std::rand::{Rng, IsaacRng, SeedableRng};
 
 use extra::test::BenchHarness;
 
-fn check(btree: &BTree<int, int>, key: int, expected: int)
+use std::hashmap::HashMap;
+use std::trie::TrieMap;
+
+
+fn check(btree: &BTree<uint, uint>, key: uint, expected: uint)
 {
     match btree.find(&key) {
         Some(val) => {
@@ -20,7 +24,7 @@ fn check(btree: &BTree<int, int>, key: int, expected: int)
     }
 }
 
-fn shuffled(count: uint) -> ~[int]
+fn shuffled(count: uint) -> ~[uint]
 {
     let mut rng = IsaacRng::new();
     rng.reseed([60387u32]);
@@ -28,7 +32,7 @@ fn shuffled(count: uint) -> ~[int]
     let mut build_arr = ~[];
 
     for i in range(0, count) {
-        build_arr.push(i as int);
+        build_arr.push(i as uint);
     }
 
     rng.shuffle_mut(build_arr);
@@ -36,122 +40,26 @@ fn shuffled(count: uint) -> ~[int]
     build_arr
 }
 
-#[test]
-fn insert_and_fetch_10()
+fn insert_and_fetch_n(len: uint)
 {
-    let mut btree: BTree<int, int> = BTree::new();
+    let mut btree: BTree<uint, uint> = BTree::new();
 
-    for i in range(0, 10) {
+    for i in range(0, len) {
         btree.insert(i, i);
     }
 
 
-    for i in range(0, 10) {
+    for i in range(0, len) {
         check(&btree, i, i);
     }
-    assert!(10 == btree.len());
+    assert!(len as uint == btree.len());
 }
 
-#[test]
-fn insert_and_fetch_80()
+fn insert_and_fetch_shuffle_n(len: uint)
 {
-    let mut btree: BTree<int, int> = BTree::new();
+    let mut btree: BTree<uint, uint> = BTree::new();
 
-    for i in range(0, 80) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 80) {
-        check(&btree, i, i);
-    }
-    assert!(80 == btree.len());
-}
-
-#[test]
-fn insert_and_fetch_120()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 120) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 120) {
-        check(&btree, i, i);
-    }
-    assert!(120 == btree.len());
-}
-
-#[test]
-fn insert_and_fetch_990()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 990) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 990) {
-        check(&btree, i, i);
-    }
-    assert!(990 == btree.len());
-}
-
-
-#[test]
-fn insert_and_fetch_1100()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 1100) {
-        btree.insert(i, i);
-        for j in range(0, i+1) {
-            check(&btree, j, j);
-        }
-    }
-
-    for i in range(0, 1100) {
-        check(&btree, i, i);
-    }
-    assert!(1100 == btree.len());
-}
-
-#[test]
-fn insert_and_fetch_5K()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 5_000) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 5_000) {
-        check(&btree, i, i);
-    }
-    assert!(5_000 == btree.len());
-}
-
-#[test]
-fn insert_and_fetch_20K()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 20_000) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 20_000) {
-        check(&btree, i, i);
-    }
-    assert!(20_000 == btree.len());
-}
-
-#[test]
-fn insert_and_fetch_shuffle_10()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(10);
+    let build_arr = shuffled(len as uint);
 
 
     for &b in build_arr.iter() {
@@ -163,135 +71,23 @@ fn insert_and_fetch_shuffle_10()
         btree.insert(b, b);
     }
 
-    for i in range(0, 10) {
+    for i in range(0, len) {
         check(&btree, i, i);
     }
-    assert!(10 == btree.len());
+    assert!(len as uint == btree.len());
 }
 
-
-#[test]
-fn insert_and_fetch_shuffle_80()
+fn update_shuffle_n(len: uint)
 {
-    let mut btree: BTree<int, int> = BTree::new();
+    let mut btree: BTree<uint, uint> = BTree::new();
 
-    let build_arr = shuffled(80);
-
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-
-    }
-
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-
-    }
-
-    for i in range(0, 80) {
-        check(&btree, i, i);
-    }
-    assert!(80 == btree.len());
-}
-
-#[test]
-fn insert_and_fetch_shuffle_120()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(120);
-
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-    }
-
-    for i in range(0, 120) {
-        check(&btree, i, i);
-    }
-    assert!(120 == btree.len());
-}
-
-
-#[test]
-fn insert_and_fetch_shuffle_990()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(990);
-
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-    }
-
-    for i in range(0, 990) {
-        check(&btree, i, i);
-    }
-    assert!(990 == btree.len());
-}
-
-
-#[test]
-fn insert_and_fetch_shuffle_1100()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(1_100);
-
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-    }
-
-    for i in range(0, 1_100) {
-        check(&btree, i, i);
-    }
-    assert!(1100 == btree.len());
-}
-
-#[test]
-fn insert_and_fetch_shuffle_5K()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(5_000);
-
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-    }
-
-    for i in range(0, 5_000) {
-        check(&btree, i, i);
-    }
-    assert!(5_000 == btree.len());
-}
-
-#[test]
-fn insert_and_fetch_shuffle_20K()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(20_000);
-
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-    }
-
-    for i in range(0, 20_000) {
-        check(&btree, i, i);
-    }
-    assert!(20_000 == btree.len());
-}
-
-#[test]
-fn update_shuffle_1100()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(1_100);
+    let build_arr = shuffled(len as uint);
 
     for &b in build_arr.iter() {
         assert!(btree.insert(b, b) == false);
     }
 
-    for i in range(0, 1_100) {
+    for i in range(0, len) {
         check(&btree, i, i);
     }
 
@@ -299,28 +95,228 @@ fn update_shuffle_1100()
         assert!(btree.insert(b, (b+100)) == true);
     }
 
-    for i in range(0, 1_100) {
+    for i in range(0, len) {
         check(&btree, i, i+100);
     }
-    assert!(1100 == btree.len());
+    assert!(len as uint == btree.len());
 }
+
+fn remove_n(len: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    let build_arr = shuffled(len as uint);
+
+    for &i in build_arr.iter() {
+        btree.insert(i, i);
+    }
+
+    for &i in build_arr.iter() {
+        check(&btree, i, i);
+    }
+
+    for &i in build_arr.iter() {
+        assert!(btree.find(&i).is_some());
+        assert!(btree.remove(&i) == true);
+        assert!(btree.find(&i).is_none());
+        assert!(btree.remove(&i) == false);
+    }
+    assert!(0 == btree.len())
+}
+
+fn pop_n(len: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    let build_arr = shuffled(len as uint);
+
+    for &i in build_arr.iter() {
+        btree.insert(i, i);
+    }
+
+    for &i in build_arr.iter() {
+        check(&btree, i, i);
+    }
+
+    for &i in build_arr.iter() {
+        assert!(btree.pop(&i).unwrap() == i);
+        assert!(btree.find(&i).is_none());
+    }
+    assert!(0 == btree.len())
+}
+
+fn find_mut_n(len: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    let build_arr = shuffled(len as uint);
+
+    for &i in build_arr.iter() {
+        btree.insert(i, i);
+    }
+
+    for &i in build_arr.iter() {
+        check(&btree, i, i);
+    }
+
+    for &i in build_arr.iter() {
+        // stupid borrow checker
+        {
+            let out = btree.find_mut(&i).unwrap();
+            assert!(*out == i);
+            *out += 100;
+        }
+
+        let out = btree.find(&i).unwrap();
+        assert!(*out == i + 100)
+    }
+    assert!(len as uint == btree.len())
+}
+
+fn swap_n(len: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    let build_arr = shuffled(len as uint);
+
+    for &i in build_arr.iter() {
+        btree.insert(i, i);
+    }
+
+    for &i in build_arr.iter() {
+        check(&btree, i, i);
+    }
+
+    for &i in build_arr.iter() {
+        let out = btree.swap(i, (i + 100)).unwrap();
+        assert!(out == i);
+        assert!(btree.swap(i, 0).unwrap() == i + 100)
+    }
+    assert!(len as uint == btree.len())
+}
+
+#[test]
+fn insert_and_fetch_10() { insert_and_fetch_n(10) }
+#[test]
+fn insert_and_fetch_80() { insert_and_fetch_n(80) }
+#[test]
+fn insert_and_fetch_120() { insert_and_fetch_n(120) }
+#[test]
+fn insert_and_fetch_990() { insert_and_fetch_n(990) }
+#[test]
+fn insert_and_fetch_2_500() { insert_and_fetch_n(2_500) }
+#[test]
+fn insert_and_fetch_10_000() { insert_and_fetch_n(10_000) }
+#[test]
+fn insert_and_fetch_40_000() { insert_and_fetch_n(40_000) }
+
+#[test]
+fn insert_and_fetch_shuffle_10() { insert_and_fetch_shuffle_n(10) }
+#[test]
+fn insert_and_fetch_shuffle_80() { insert_and_fetch_shuffle_n(80) }
+#[test]
+fn insert_and_fetch_shuffle_120() { insert_and_fetch_shuffle_n(120) }
+#[test]
+fn insert_and_fetch_shuffle_990() { insert_and_fetch_shuffle_n(990) }
+#[test]
+fn insert_and_fetch_shuffle_2_500() { insert_and_fetch_shuffle_n(2_500) }
+#[test]
+fn insert_and_fetch_shuffle_10_000() { insert_and_fetch_shuffle_n(10_000) }
+#[test]
+fn insert_and_fetch_shuffle_40_000() { insert_and_fetch_shuffle_n(40_000) }
+
+#[test]
+fn update_and_fetch_10() { update_shuffle_n(10) }
+#[test]
+fn update_and_fetch_80() { update_shuffle_n(80) }
+#[test]
+fn update_and_fetch_120() { update_shuffle_n(120) }
+#[test]
+fn update_and_fetch_990() { update_shuffle_n(990) }
+#[test]
+fn update_and_fetch_2_500() { update_shuffle_n(2_500) }
+#[test]
+fn update_and_fetch_10_000() { update_shuffle_n(10_000) }
+#[test]
+fn update_and_fetch_40_000() { update_shuffle_n(40_000) }
+
+#[test]
+fn remove_10() { remove_n(10) }
+#[test]
+fn remove_80() { remove_n(80) }
+#[test]
+fn remove_120() { remove_n(120) }
+#[test]
+fn remove_990() { remove_n(990) }
+#[test]
+fn remove_2_500() { remove_n(2_500) }
+#[test]
+fn remove_10_000() { remove_n(10_000) }
+#[test]
+fn remove_40_000() { remove_n(40_000) }
+
+#[test]
+fn pop_10() { pop_n(10) }
+#[test]
+fn pop_80() { pop_n(80) }
+#[test]
+fn pop_120() { pop_n(120) }
+#[test]
+fn pop_990() { pop_n(990) }
+#[test]
+fn pop_2_500() { pop_n(2_500) }
+#[test]
+fn pop_10_000() { pop_n(10_000) }
+#[test]
+fn pop_40_000() { pop_n(40_000) }
+
+#[test]
+fn find_mut_10() { find_mut_n(10) }
+#[test]
+fn find_mut_80() { find_mut_n(80) }
+#[test]
+fn find_mut_120() { find_mut_n(120) }
+#[test]
+fn find_mut_990() { find_mut_n(990) }
+#[test]
+fn find_mut_2_500() { find_mut_n(2_500) }
+#[test]
+fn find_mut_10_000() { find_mut_n(10_000) }
+#[test]
+fn find_mut_40_000() { find_mut_n(40_000) }
+
+#[test]
+fn swap_10() { swap_n(10) }
+#[test]
+fn swap_80() { swap_n(80) }
+#[test]
+fn swap_120() { swap_n(120) }
+#[test]
+fn swap_990() { swap_n(990) }
+#[test]
+fn swap_2_500() { swap_n(2_500) }
+#[test]
+fn swap_10_000() { swap_n(10_000) }
+#[test]
+fn swap_40_000() { swap_n(40_000) }
+
 
 #[test]
 fn freeze()
 {
-    let mut btree: BTree<int, int> = BTree::new();
+    let mut btree: BTree<uint, uint> = BTree::new();
 
-    for i in range(0, 1100) {
+    for i in range(0, 1100u) {
         btree.insert(i, i);
     }
 
-    for i in range(0, 1100) {
+    for i in range(0, 1100u) {
         check(&btree, i, i);
     }
 
     btree.freeze();
 
-    for i in range(0, 1100) {
+    for i in range(0, 1100u) {
         check(&btree, i, i);
     }    
 }
@@ -328,26 +324,23 @@ fn freeze()
 #[test]
 fn freeze_set()
 {
-    let mut btree: BTree<int, int> = BTree::new();
+    let mut btree: BTree<uint, uint> = BTree::new();
 
-    for i in range(0, 1100) {
+    for i in range(0, 1100u) {
         btree.insert(i, i);
     }
 
-    for i in range(0, 1100) {
+    for i in range(0, 1100u) {
         check(&btree, i, i);
     }
 
     btree.freeze();
 
-    for i in range(1100, 2200) {
+    for i in range(1100u, 2200u) {
         btree.insert(i, i);
-        for j in range(0, i+1) {
-            check(&btree, j, j);
-        }
     }
 
-    for i in range(0, 2200) {
+    for i in range(0, 2200u) {
         check(&btree, i, i);
     } 
 }
@@ -355,13 +348,13 @@ fn freeze_set()
 #[test]
 fn freeze_set2()
 {
-    let mut btree: BTree<int, int> = BTree::new();
+    let mut btree: BTree<uint, uint> = BTree::new();
 
-    for i in range(0, 1100) {
+    for i in range(0, 1100u) {
         btree.insert(i, i);
     }
 
-    for i in range(0, 1100) {
+    for i in range(0, 1100u) {
         check(&btree, i, i);
     }
 
@@ -369,419 +362,182 @@ fn freeze_set2()
 
     let old = btree.clone();
 
-    for i in range(1100, 2200) {
+    for i in range(1100u, 2200u) {
         btree.insert(i, i);
         for j in range(0, i+1) {
             check(&btree, j, j);
         }
     }
 
-    for i in range(0, 2200) {
+    for i in range(0, 2200u) {
         check(&btree, i, i);
     }
 
-    for i in range(0, 1100) {
+    for i in range(0, 1100u) {
         check(&old, i, i);
     }
 
-    for i in range(1100, 2200) {
+    for i in range(1100u, 2200u) {
         assert!(old.find(&i).is_none());
     } 
 }
 
-#[test]
-fn freeze_tasks()
+
+fn bench_insert_forward_n<T: MutableMap<uint, uint>>(bench: &mut BenchHarness, len: uint, new: || -> T)
 {
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 1100) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 1100) {
-        check(&btree, i, i);
-    }
-
-    btree.freeze();
-
-    for _ in range(0, 8) {
-        let old = btree.clone();
-
-        do std::task::spawn {
-            for i in range(0, 1100) {
-                check(&old, i, i);
-            }
+    bench.iter(|| {
+        let mut map = new();
+        for b in range(0, len) {
+            map.insert(b, b);
         }
-    }
+    });
 }
 
-#[test]
-fn remove_test_10()
+fn bench_insert_shuffle_n<T: MutableMap<uint, uint>>(bench: &mut BenchHarness, len: uint, new: || -> T)
 {
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(10);
-
-    for &i in build_arr.iter() {
-        btree.insert(i, i);
-    }
-
-    for &i in build_arr.iter() {
-        check(&btree, i, i);
-    }
-
-    for &i in build_arr.iter() {
-        assert!(btree.find(&i).is_some());
-        assert!(btree.remove(&i) == true);
-        assert!(btree.find(&i).is_none());
-        assert!(btree.remove(&i) == false);
-    }
-    assert!(0 == btree.len())
-}
-
-#[test]
-fn remove_test_100()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(100);
-
-    for &i in build_arr.iter() {
-        btree.insert(i, i);
-    }
-
-    for &i in build_arr.iter() {
-        check(&btree, i, i);
-    }
-
-    for &i in build_arr.iter() {
-        assert!(btree.find(&i).is_some());
-        assert!(btree.remove(&i) == true);
-        assert!(btree.find(&i).is_none());
-        assert!(btree.remove(&i) == false);
-    }
-    assert!(0 == btree.len())
-}
-
-#[test]
-fn remove_test_1K()
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    let build_arr = shuffled(1_000);
-
-    for &i in build_arr.iter() {
-        btree.insert(i, i);
-    }
-
-    for &i in build_arr.iter() {
-        check(&btree, i, i);
-    }
-
-    for &i in build_arr.iter() {
-        assert!(btree.find(&i).is_some());
-        assert!(btree.remove(&i) == true);
-        assert!(btree.find(&i).is_none());
-        assert!(btree.remove(&i) == false);
-    }
-    assert!(0 == btree.len());
-}
-
-#[bench]
-fn btree_bench_insert_1K_shuffle(bench: &mut BenchHarness)
-{
-    let build_arr = shuffled(1_000);
+    let build_arr = shuffled(len as uint);
 
     bench.iter(|| {
-        let mut btree: BTree<int, int> = BTree::new();
+        let mut map = new();
         for &b in build_arr.iter() {
-            btree.insert(b, b);
+            map.insert(b, b);
         }
-    });
+    });    
 }
 
-#[bench]
-fn btree_bench_insert_1K_linear(bench: &mut BenchHarness)
+fn bench_update_forward_n<T: MutableMap<uint, uint>>(bench: &mut BenchHarness, len: uint, new: || -> T)
 {
+    let mut map = new();
+    for b in range(0, len) {
+        map.insert(b, b);
+    }
+
     bench.iter(|| {
-        let mut btree: BTree<int, int> = BTree::new();
-        for b in range(0, 1_000) {
-            btree.insert(b, b);
+        for b in range(0, len) {
+            map.swap(b, b+100);
         }
     });
 }
 
-#[bench]
-fn btree_bench_update_1K_shuffle(bench: &mut BenchHarness)
+fn bench_update_shuffle_n<T: MutableMap<uint, uint>>(bench: &mut BenchHarness, len: uint, new: || -> T)
 {
-    let build_arr = shuffled(1_000);
-
-    let mut btree: BTree<int, int> = BTree::new();
+    let build_arr = shuffled(len as uint);
+    let mut map = new();
     for &b in build_arr.iter() {
-        btree.insert(b, b);
+        map.insert(b, b);
     }
 
     bench.iter(|| {
-        for &b in build_arr.iter() {
-            btree.insert(b, b);
-        }
-    });
-    assert!(1_000 == btree.len());
-}
-
-#[bench]
-fn btree_bench_update_1K_linear(bench: &mut BenchHarness)
-{
-    let mut btree: BTree<int, int> = BTree::new();
-    for b in range(0, 1_000) {
-        btree.insert(b, b);
-    }
-
-    bench.iter(|| {
-        for b in range(0, 1_000) {
-            btree.insert(b, b);
+        for b in range(0, len) {
+            map.swap(b, b+100);
         }
     });
 }
 
 #[bench]
-fn hmap_bench_update_1K_shuffle(bench: &mut BenchHarness)
-{
-    let build_arr = shuffled(1_000);
-
-    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
-    for &b in build_arr.iter() {
-        hmap.insert(b, b);
-    }
-
-    bench.iter(|| {
-        for &b in build_arr.iter() {
-            hmap.insert(b, b);
-        }
-    });
-}
+fn btree_insert_forward_10(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_insert_forward_100(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 100, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_insert_forward_1_000(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 1_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_insert_forward_10_000(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
 
 #[bench]
-fn hmap_bench_update_1K_linear(bench: &mut BenchHarness)
-{
-    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
-    for b in range(0, 1_000) {
-        hmap.insert(b, b);
-    }
-
-    bench.iter(|| {
-        for b in range(0, 1_000) {
-            hmap.insert(b, b);
-        }
-    });
-}
+fn btree_insert_shuffle_10(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_insert_shuffle_100(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 100, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_insert_shuffle_1_000(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 1_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_insert_shuffle_10_000(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
 
 #[bench]
-fn btree_bench_get_1K(bench: &mut BenchHarness)
-{
-    let build_arr = shuffled(1_000);
-
-    let mut btree: BTree<int, int> = BTree::new();
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-    }
-
-    bench.iter(|| {
-        for b in build_arr.iter() {
-            btree.find(b);
-        }
-    });
-}
-
+fn btree_update_forward_10(bench: &mut BenchHarness) {bench_update_forward_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_update_forward_100(bench: &mut BenchHarness) {bench_update_forward_n(bench, 100, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_update_forward_1_000(bench: &mut BenchHarness) {bench_update_forward_n(bench, 1_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_update_forward_10_000(bench: &mut BenchHarness) {bench_update_forward_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
 
 #[bench]
-fn btree_bench_shuffle_100K_get_1K(bench: &mut BenchHarness)
-{
-    let build_arr = shuffled(100_000);
-
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for &b in build_arr.iter() {
-        btree.insert(b, b);
-    }
-
-    bench.iter(|| {
-        for b in build_arr.slice(0, 1_000).iter() {
-            btree.find(b);
-        }
-    });
-}
+fn btree_update_shuffle_10(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_update_shuffle_100(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 100, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_update_shuffle_1_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 1_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_update_shuffle_10_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
 
 #[bench]
-fn hmap_bench_shuffle_100K_get_1K(bench: &mut BenchHarness)
-{
-    let build_arr = shuffled(100_000);
-
-    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
-
-    for &b in build_arr.iter() {
-        hmap.insert(b, b);
-    }
-
-    bench.iter(|| {
-        for b in build_arr.slice(0, 1_000).iter() {
-            hmap.find(b);
-        }
-    });
-}
+fn hmap_insert_forward_10(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_insert_forward_100(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_insert_forward_1_000(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 1_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_insert_forward_10_000(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
 
 #[bench]
-fn btree_bench_linear_100K_get_1K(bench: &mut BenchHarness)
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 100_000) {
-        btree.insert(i, i);
-    }
-
-    bench.iter(|| {
-        for i in range(0, 1_000) {
-            btree.find(&i);
-        }
-    });
-}
-
+fn hmap_insert_shuffle_10(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_insert_shuffle_100(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_insert_shuffle_1_000(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 1_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_insert_shuffle_10_000(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
 
 #[bench]
-fn hmap_bench_linear_100K_get_1K(bench: &mut BenchHarness)
-{
-    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
-
-    for i in range(0, 100_000) {
-        hmap.insert(i, i);
-    }
-
-    bench.iter(|| {
-        for i in range(0, 1_000) {
-            hmap.find(&i);
-        }
-    });
-}
+fn hmap_update_forward_10(bench: &mut BenchHarness) {bench_update_forward_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_update_forward_100(bench: &mut BenchHarness) {bench_update_forward_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_update_forward_1_000(bench: &mut BenchHarness) {bench_update_forward_n(bench, 1_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_update_forward_10_000(bench: &mut BenchHarness) {bench_update_forward_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
 
 #[bench]
-fn hmap_bench_get_1K(bench: &mut BenchHarness)
-{
-    let build_arr = shuffled(1_000);
-
-    let mut hmap: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
-    for b in build_arr.iter() {
-        hmap.insert(*b, *b);
-    }
-
-    bench.iter(|| {
-        for b in build_arr.iter() {
-            hmap.find(b);
-        }
-    });
-}
-
+fn hmap_update_shuffle_10(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_update_shuffle_100(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_update_shuffle_1_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 1_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_update_shuffle_10_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
 
 #[bench]
-fn hmap_bench_insert_1K(bench: &mut BenchHarness)
-{
-    let mut rng = IsaacRng::new();
-    rng.reseed([60387u32]);
-
-    let mut build_arr = ~[];
-
-    for i in range(0, 1_000) {
-        build_arr.push(i);
-    }
-
-    rng.shuffle_mut(build_arr);
-
-    bench.iter(|| {
-        let mut btree: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
-        for b in build_arr.iter() {
-            btree.insert(*b, *b);
-        }
-    });
-
-}
+fn tris_insert_forward_10(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_insert_forward_100(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 100, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_insert_forward_1_000(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 1_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_insert_forward_10_000(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
 
 #[bench]
-fn btree_clone_nofreeze(bench: &mut BenchHarness)
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 5_000) {
-        btree.insert(i, i);
-    }
-
-    bench.iter(|| {
-        let _ = btree.clone();
-    });
-}
+fn tris_insert_shuffle_10(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 10, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_insert_shuffle_100(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 100, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_insert_shuffle_1_000(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 1_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_insert_shuffle_10_000(bench: &mut BenchHarness) {bench_insert_shuffle_n(bench, 10_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
 
 #[bench]
-fn btree_clone_freeze(bench: &mut BenchHarness)
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 5_000) {
-        btree.insert(i, i);
-    }
-
-    btree.freeze();
-
-    bench.iter(|| {
-        let _ = btree.clone();
-    });
-}
+fn tris_update_forward_10(bench: &mut BenchHarness) {bench_update_forward_n(bench, 10, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_update_forward_100(bench: &mut BenchHarness) {bench_update_forward_n(bench, 100, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_update_forward_1_000(bench: &mut BenchHarness) {bench_update_forward_n(bench, 1_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_update_forward_10_000(bench: &mut BenchHarness) {bench_update_forward_n(bench, 10_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
 
 #[bench]
-fn hmap_clone(bench: &mut BenchHarness)
-{
-    let mut btree: std::hashmap::HashMap<int, int> = std::hashmap::HashMap::new();
-
-    for i in range(0, 5_000) {
-        btree.insert(i, i);
-    }
-
-    bench.iter(|| {
-        let _ = btree.clone();
-    });
-}
-
+fn tris_update_shuffle_10(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10, || {let out: TrieMap<uint> = TrieMap::new(); out})}
 #[bench]
-fn btree_clone_freeze_set_1K(bench: &mut BenchHarness)
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 5_000) {
-        btree.insert(i, i);
-    }
-
-    btree.freeze();
-
-    bench.iter(|| {
-        let mut new = btree.clone();
-        for i in range(0, 1_000) {
-            new.insert(i, i);
-        }
-        assert!(5_000 == new.len());
-    });
-}
-
+fn tris_update_shuffle_100(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 100, || {let out: TrieMap<uint> = TrieMap::new(); out})}
 #[bench]
-fn btree_clone_nofreeze_set_1K(bench: &mut BenchHarness)
-{
-    let mut btree: BTree<int, int> = BTree::new();
-
-    for i in range(0, 5_000) {
-        btree.insert(i, i);
-    }
-
-    bench.iter(|| {
-        let mut new = btree.clone();
-        for i in range(0, 1_000) {
-            new.insert(i, i);
-        }
-        assert!(5_000 == new.len());
-    });
-}
+fn tris_update_shuffle_1_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 1_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}
+#[bench]
+fn tris_update_shuffle_10_000(bench: &mut BenchHarness) {bench_update_shuffle_n(bench, 10_000, || {let out: TrieMap<uint> = TrieMap::new(); out})}

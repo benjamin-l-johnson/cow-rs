@@ -43,9 +43,8 @@ enum InsertAction<K> {
     InsertUnfreeze
 }
 
-enum RemoveAction<K> {
-    RemoveDone(bool, bool),
-    RemoveUpdateLeft(K),
+enum RemoveAction<K, V> {
+    RemoveDone(Option<K>, Option<V>, bool),
     RemoveUnfreeze
 }
 
@@ -144,17 +143,17 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         }
     }
 
-    pub fn remove(&mut self, key: &K) -> RemoveAction<K>
+    pub fn pop(&mut self, key: &K) -> RemoveAction<K, V>
     {
         match *self {
             Empty => {
-                RemoveDone(false, false)
+                RemoveDone(None, None, false)
             },
             Leaf(ref mut leaf) => {
-                (*leaf).remove(key)
+                (*leaf).pop(key)
             },
             Internal(ref mut node) => {
-                (*node).remove(key)
+                (*node).pop(key)
             },
             SharedLeaf(_) => {
                 RemoveUnfreeze
@@ -277,6 +276,26 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
             },
         }     
     }
+
+    pub fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
+    {
+        self.unfreeze();
+
+        match *self {
+            Empty => {
+                None
+            },
+            Leaf(ref mut leaf) => {
+                (*leaf).find_mut(key)
+            },
+            Internal(ref mut node) => {
+                (*node).find_mut(key)
+            },
+            SharedLeaf(_) | SharedInternal(_) => {
+                fail!("this should not be shared!")
+            },
+        }
+    }
 }
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
@@ -333,16 +352,13 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
         }
     }
 
-    pub fn remove(&mut self, key: &K) -> bool
+    pub fn pop(&mut self, key: &K) -> Option<V>
     {
-        match self.root.remove(key) {
-            RemoveDone(found, _) => found,
+        match self.root.pop(key) {
+            RemoveDone(_, found, _) => found,
             _ => fail!("not supported")
         }
     }
-
-
-
 
     pub fn freeze(&mut self)
     {
@@ -503,9 +519,14 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         }
     }
 
-    fn remove(&mut self, key: &K) -> RemoveAction<K>
+    fn pop(&mut self, key: &K) -> RemoveAction<K, V>
     {
-        self.children[self.search(key)].remove(key)
+        self.children[self.search(key)].pop(key)
+    }
+
+    fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
+    {
+        self.children[self.search(key)].find_mut(key)
     }
 
     fn search_linear(&self, key: &K) -> uint
@@ -544,11 +565,13 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
 
     fn search(&self, key: &K) -> uint
     {
-        if self.used < 16 {
+        let out = if self.used < 16 {
             self.search_linear(key)
         } else {
             self.search_bsec(key)
-        }
+        };
+
+        out
     }
 
     fn split(&mut self) -> (NodeInternal<K, V>, K)
@@ -591,7 +614,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
     fn len(&self) -> uint
     {
         let mut len = 0;
-        for i in range(0, self.used+1) {
+        for i in range(0, self.used) {
             len += self.children[i].len();
         }
         len
@@ -663,11 +686,11 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
         None
     }
 
-    fn remove(&mut self, key: &K) -> RemoveAction<K>
+    fn pop(&mut self, key: &K) -> RemoveAction<K, V>
     {
         let idx = match self.search(key) {
             Some(idx) => idx,
-            None => return RemoveDone(false, false)
+            None => return RemoveDone(None, None, false)
         };
 
         let mut key = default();
@@ -682,7 +705,13 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
 
         self.used -= 1;
 
-        RemoveDone(true, self.used < LEAF_SIZE / 2)
+        RemoveDone( if self.used != 0 {
+                        Some(self.keys[self.used-1].clone())
+                    } else {
+                        None
+                    },
+                    Some(value),
+                    self.used < LEAF_SIZE / 2)
     }
 
 
@@ -691,6 +720,14 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
     {
         match self.search(key) {
             Some(idx) => Some(&self.values[idx]),
+            None => None
+        }
+    }
+
+    fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
+    {
+        match self.search(key) {
+            Some(idx) => Some(&mut self.values[idx]),
             None => None
         }
     }
@@ -789,5 +826,27 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable 
     fn clear(&mut self)
     {
         self.root = Empty;
+    }
+}
+
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableMap<K, V> for BTree<K, V> {
+    fn swap(&mut self, key: K, value: V) -> Option<V>
+    {
+        let old = self.pop(&key);
+        self.insert(key, value);
+        old
+    }
+
+    fn pop(&mut self, key: &K) -> Option<V>
+    {
+        match self.root.pop(key) {
+            RemoveDone(_, found, _) => found,
+            _ => fail!("not supported")
+        }        
+    }
+
+    fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
+    {
+        self.root.find_mut(key)
     }
 }
