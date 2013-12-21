@@ -476,6 +476,23 @@ fn bench_clone_n<T: MutableMap<uint, uint>+Clone>(bench: &mut BenchHarness, len:
     });
 }
 
+
+fn bench_remove_n<T: MutableMap<uint, uint>+Clone>(bench: &mut BenchHarness, len: uint, new: || -> T)
+{
+    let build_arr = shuffled(len as uint);
+    let mut map = new();
+    for &b in build_arr.iter() {
+        map.insert(b, b);
+    }
+
+    bench.iter(|| {
+        let mut map = map.clone();
+        for &b in build_arr.iter() {
+            map.remove(&b);
+        }
+    });
+}
+
 #[bench]
 fn btree_insert_forward_10(bench: &mut BenchHarness) {bench_insert_forward_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
 #[bench]
@@ -539,7 +556,14 @@ fn btree_clone_shuffle_1_000(bench: &mut BenchHarness) {bench_clone_n(bench, 1_0
 #[bench]
 fn btree_clone_shuffle_10_000(bench: &mut BenchHarness) {bench_clone_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
 
-
+#[bench]
+fn btree_remove_shuffle_10(bench: &mut BenchHarness) {bench_remove_n(bench, 10, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_remove_shuffle_100(bench: &mut BenchHarness) {bench_remove_n(bench, 100, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_remove_shuffle_1_000(bench: &mut BenchHarness) {bench_remove_n(bench, 1_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
+#[bench]
+fn btree_remove_shuffle_10_000(bench: &mut BenchHarness) {bench_remove_n(bench, 10_000, || {let out: BTree<uint, uint> = BTree::new(); out})}
 
 
 #[bench]
@@ -605,7 +629,14 @@ fn hmap_clone_shuffle_1_000(bench: &mut BenchHarness) {bench_clone_n(bench, 1_00
 #[bench]
 fn hmap_clone_shuffle_10_000(bench: &mut BenchHarness) {bench_clone_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
 
-
+#[bench]
+fn hmap_remove_shuffle_10(bench: &mut BenchHarness) {bench_remove_n(bench, 10, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_remove_shuffle_100(bench: &mut BenchHarness) {bench_remove_n(bench, 100, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_remove_shuffle_1_000(bench: &mut BenchHarness) {bench_remove_n(bench, 1_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
+#[bench]
+fn hmap_remove_shuffle_10_000(bench: &mut BenchHarness) {bench_remove_n(bench, 10_000, || {let out: HashMap<uint, uint> = HashMap::new(); out})}
 
 
 #[bench]
