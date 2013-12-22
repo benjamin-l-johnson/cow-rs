@@ -27,7 +27,7 @@ fn check(btree: &BTree<uint, uint>, key: uint, expected: uint)
 fn shuffled(count: uint) -> ~[uint]
 {
     let mut rng = IsaacRng::new();
-    rng.reseed([60387u32]);
+    rng.reseed([60388u32]);
 
     let mut build_arr = ~[];
 
@@ -116,7 +116,9 @@ fn remove_n(len: uint)
     }
 
     for &i in build_arr.iter() {
-        assert!(btree.find(&i).is_some());
+        if !btree.find(&i).is_some() {
+            println!("{:?}, {:?}", i, btree);
+        }
         assert!(btree.remove(&i) == true);
         assert!(btree.find(&i).is_none());
         assert!(btree.remove(&i) == false);
@@ -193,6 +195,37 @@ fn swap_n(len: uint)
         assert!(btree.swap(i, 0).unwrap() == i + 100)
     }
     assert!(len as uint == btree.len())
+}
+
+fn insert_remove_shuffle_n(len: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    let build_arr = shuffled((len*4) as uint);
+
+    for i in range(0u, 4u) {
+        for &b in build_arr.slice(len*i, len*(i+1)).iter() {
+            btree.insert(b, b);
+        }
+
+        for &b in build_arr.slice(len*i, len*(i+1)).iter() {
+            check(&btree, b, b);
+        }
+    }
+
+    for &b in build_arr.slice(0, len*4).iter() {
+        check(&btree, b, b);
+    }
+
+    for i in range(0u, 4u) {
+        for &b in build_arr.slice(len*i, len*(i+1)).iter() {
+            btree.remove(&b);
+        }
+
+        for &b in build_arr.slice(len*(i+1), len*4).iter() {
+            check(&btree, b, b);
+        }
+    }
 }
 
 #[test]
@@ -300,6 +333,20 @@ fn swap_10_000() { swap_n(10_000) }
 #[test]
 fn swap_40_000() { swap_n(40_000) }
 
+#[test]
+fn insert_remove_shuffle_10() { insert_remove_shuffle_n(10) }
+#[test]
+fn insert_remove_shuffle_80() { insert_remove_shuffle_n(80) }
+#[test]
+fn insert_remove_shuffle_120() { insert_remove_shuffle_n(120) }
+#[test]
+fn insert_remove_shuffle_990() { insert_remove_shuffle_n(990) }
+#[test]
+fn insert_remove_shuffle_2_500() { insert_remove_shuffle_n(2_500) }
+#[test]
+fn insert_remove_shuffle_10_000() { insert_remove_shuffle_n(10_000) }
+#[test]
+fn insert_remove_shuffle_40_000() { insert_remove_shuffle_n(40_000) }
 
 #[test]
 fn freeze()

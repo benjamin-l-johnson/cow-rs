@@ -43,11 +43,6 @@ enum InsertAction<K> {
     InsertUnfreeze
 }
 
-enum RemoveAction<K, V> {
-    RemoveDone(Option<K>, Option<V>, bool),
-    RemoveUnfreeze
-}
-
 pub struct BTreeStat {
     mut_leaves: uint,
     mut_nodes: uint,
@@ -143,11 +138,12 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         }
     }
 
-    pub fn pop(&mut self, key: &K) -> RemoveAction<K, V>
+    pub fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
     {
+        self.unfreeze();
         match *self {
             Empty => {
-                RemoveDone(None, None, false)
+                (None, None, false)
             },
             Leaf(ref mut leaf) => {
                 (*leaf).pop(key)
@@ -155,11 +151,8 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
             Internal(ref mut node) => {
                 (*node).pop(key)
             },
-            SharedLeaf(_) => {
-                RemoveUnfreeze
-            },
-            SharedInternal(_) => {
-                RemoveUnfreeze
+            SharedLeaf(_) | SharedInternal(_) => {
+                fail!("should have been unfrozen");
             },
         }        
     }
@@ -296,85 +289,64 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
             },
         }
     }
-}
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
-{
-    fn clone(&self) -> BTree<K, V>
+    // move the lowest key from other to self iff node is has extra keys
+    fn rotate_right(&mut self, src: &mut Node<K, V>) -> bool
     {
-        BTree {
-            root: self.root.clone()
-        }    
-    }
-}
-
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
-{
-    pub fn new() -> BTree<K, V>
-    {
-        BTree {
-            root: Empty
-        }
-    }
-
-    pub fn insert(&mut self, key: K, value: V) -> bool
-    {
-        match self.root.insert(&key, &value) {
-            InsertDone(update) => update,
-            // if the left key is only updated
-            // on an insert, not an update so this
-            // can return false
-            InsertUpdateLeft(_) => false,
-            InsertUnfreeze => {
-                self.root.unfreeze();
-                self.insert(key, value)
-            }
-            Split => {
-                let (split_key, right) = match self.root {
-                    Leaf(ref mut leaf) => {
-                        let (right, key) = leaf.split();
-                        (key, Leaf(~right))
-                    },
-                    Internal(ref mut node) => {
-                        let (right, key) = node.split();
-                        (key, Internal(~right))
-
-                    }
-                    _ => fail!("this is impossible")
-                };
-                let mut left = Empty;
-
-                util::swap(&mut self.root, &mut left);
-
-                self.root = Internal(~NodeInternal::new(split_key, left, right));
-                self.insert(key, value)
+        src.unfreeze();
+        match (self, src) {
+            (&Leaf(ref mut sink), &Leaf(ref mut src)) => {
+                sink.rotate_right(&mut (**src))
+            },
+            (&Internal(ref mut sink), &Internal(ref mut src)) => {
+                sink.rotate_right(&mut (**src))
+            },
+            (left, right) => {
+                println!("{:?} {:?}", left, right);
+                fail!("both nodes should be of the same type");
             }
         }
     }
 
-    pub fn pop(&mut self, key: &K) -> Option<V>
+    // move highest key from src to self iff node is has extra keys
+    fn rotate_left(&mut self, src: &mut Node<K, V>) -> bool
     {
-        match self.root.pop(key) {
-            RemoveDone(_, found, _) => found,
-            _ => fail!("not supported")
+        src.unfreeze();
+        match (self, src) {
+            (&Leaf(ref mut sink), &Leaf(ref mut src)) => {
+                sink.rotate_left(&mut (**src))
+            },
+            (&Internal(ref mut sink), &Internal(ref mut src)) => {
+                sink.rotate_left(&mut (**src))
+            },
+            (left, right) => {
+                println!("{:?} {:?}", left, right);
+                fail!("both nodes should be of the same type");
+            }
         }
     }
 
-    pub fn freeze(&mut self)
+    fn max_key(&self) -> K
     {
-        self.root.freeze()
-    }
-
-    pub fn unfreeze(&mut self)
-    {
-        self.root.unfreeze()
-    }
-
-    pub fn stat(&self) -> BTreeStat
-    {
-        self.root.stat()
+        match *self {
+            Leaf(ref leaf) => {
+                (*leaf).max_key()
+            },
+            Internal(ref node) => {
+                (*node).max_key()
+            },
+            SharedLeaf(ref leaf) => {
+                (*leaf).get().max_key()
+            },
+            SharedInternal(ref node) => {
+                (*node).get().max_key()
+            },
+            Empty => fail!("invalid node")
+        }
     }
 }
+
+
 
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
@@ -519,9 +491,48 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         }
     }
 
-    fn pop(&mut self, key: &K) -> RemoveAction<K, V>
+    fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
     {
-        self.children[self.search(key)].pop(key)
+        let idx = self.search(key);
+        let (key, value, needs_merge) = self.children[idx].pop(key);
+        let mut key = key;
+
+        if needs_merge {
+            let succ = if idx == self.used {
+                let (left, right) = self.children.mut_split_at(idx+1);
+                let succ = left[idx].rotate_left(&mut right[0]);
+                if succ { 
+                    self.keys[idx] = left[idx].max_key();
+                    key = None;
+                }
+                succ
+            } else {
+                false
+            };
+
+            let succ = if !succ && idx != 0 {
+                let (left, right) = self.children.mut_split_at(idx);
+                let succ =  right[0].rotate_right(&mut left[idx-1]);
+                if succ {
+                    self.keys[idx-1] = left[idx-1].max_key();
+                }
+                succ
+            } else {
+                false
+            };
+
+           // needs to merge
+        }
+
+        if self.used-1 != idx {
+            match key {
+                Some(key) => self.keys[idx] = key,
+                None => ()
+            }
+            (None, value, self.used < INTERNAL_SIZE / 2)
+        } else {
+            (key, value, self.used < INTERNAL_SIZE / 2)
+        }
     }
 
     fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
@@ -619,6 +630,55 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         }
         len
     }
+
+    fn rotate_left(&mut self, left: &mut NodeInternal<K, V>) -> bool
+    {
+        if left.used > INTERNAL_SIZE / 2 {
+            util::swap(&mut self.keys[self.used-1], &mut left.keys[0]);
+            for i in range(0, left.used-2) {
+                left.keys.swap(i, i+1);
+            }
+
+            util::swap(&mut self.children[self.used], &mut left.children[0]);
+            for i in range(0, left.used-1) {
+                left.children.swap(i, i+1);
+            }
+
+            left.used -= 1;
+            self.used += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn rotate_right(&mut self, right: &mut NodeInternal<K, V>) -> bool
+    {
+        if right.used > INTERNAL_SIZE / 2 {
+            for i in range(0, self.used) {
+                let i = self.used - i;
+                self.keys.swap(i, i-1);
+            }
+            util::swap(&mut self.keys[0], &mut right.keys[self.used-2]);
+
+            for i in range(0, self.used+1) {
+                let i = self.used + 1 - i;
+                self.children.swap(i, i-1);
+            }
+            util::swap(&mut self.children[0], &mut right.children[self.used-1]);
+
+            right.used -= 1;
+            self.used += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn max_key(&self) -> K
+    {
+        self.children[self.used-1].max_key()
+    }
 }
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
@@ -686,11 +746,11 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
         None
     }
 
-    fn pop(&mut self, key: &K) -> RemoveAction<K, V>
+    fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
     {
         let idx = match self.search(key) {
             Some(idx) => idx,
-            None => return RemoveDone(None, None, false)
+            None => return (None, None, false)
         };
 
         let mut key = default();
@@ -705,13 +765,13 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
 
         self.used -= 1;
 
-        RemoveDone( if self.used != 0 {
-                        Some(self.keys[self.used-1].clone())
-                    } else {
-                        None
-                    },
-                    Some(value),
-                    self.used < LEAF_SIZE / 2)
+        (   if self.used != 0 {
+                Some(self.keys[self.used-1].clone())
+            } else {
+                None
+            },
+            Some(value),
+            self.used < LEAF_SIZE / 2)
     }
 
 
@@ -760,6 +820,55 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
     fn len(&self) -> uint
     {
         return self.used;
+    }
+
+    fn rotate_left(&mut self, left: &mut NodeLeaf<K, V>) -> bool
+    {
+        if left.used > LEAF_SIZE / 2 {
+            util::swap(&mut self.keys[self.used], &mut left.keys[0]);
+            for i in range(0, left.used-1) {
+                left.keys.swap(i, i+1);
+            }
+
+            util::swap(&mut self.values[self.used], &mut left.values[0]);
+            for i in range(0, left.used-1) {
+                left.values.swap(i, i+1);
+            }
+
+            left.used -= 1;
+            self.used += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn rotate_right(&mut self, right: &mut NodeLeaf<K, V>) -> bool
+    {
+        if right.used > LEAF_SIZE / 2 {
+            for i in range(0, self.used+1) {
+                let i = self.used + 1 - i;
+                self.keys.swap(i, i-1);
+            }
+            util::swap(&mut self.keys[0], &mut right.keys[right.used-1]);
+
+            for i in range(0, self.used+1) {
+                let i = self.used + 1 - i;
+                self.values.swap(i, i-1);
+            }
+            util::swap(&mut self.values[0], &mut right.values[right.used-1]);
+
+            right.used -= 1;
+            self.used += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn max_key(&self) -> K
+    {
+        self.keys[self.used-1].clone()
     }
 }
 
@@ -840,8 +949,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableM
     fn pop(&mut self, key: &K) -> Option<V>
     {
         match self.root.pop(key) {
-            RemoveDone(_, found, _) => found,
-            _ => fail!("not supported")
+            (_, found, _) => found,
         }        
     }
 
@@ -853,5 +961,82 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableM
     fn insert(&mut self, key: K, value: V) -> bool
     {
         self.insert(key, value)
+    }
+}
+
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
+{
+    fn clone(&self) -> BTree<K, V>
+    {
+        BTree {
+            root: self.root.clone()
+        }    
+    }
+}
+
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
+{
+    pub fn new() -> BTree<K, V>
+    {
+        BTree {
+            root: Empty
+        }
+    }
+
+    pub fn insert(&mut self, key: K, value: V) -> bool
+    {
+        match self.root.insert(&key, &value) {
+            InsertDone(update) => update,
+            // if the left key is only updated
+            // on an insert, not an update so this
+            // can return false
+            InsertUpdateLeft(_) => false,
+            InsertUnfreeze => {
+                self.root.unfreeze();
+                self.insert(key, value)
+            }
+            Split => {
+                let (split_key, right) = match self.root {
+                    Leaf(ref mut leaf) => {
+                        let (right, key) = leaf.split();
+                        (key, Leaf(~right))
+                    },
+                    Internal(ref mut node) => {
+                        let (right, key) = node.split();
+                        (key, Internal(~right))
+
+                    }
+                    _ => fail!("this is impossible")
+                };
+                let mut left = Empty;
+
+                util::swap(&mut self.root, &mut left);
+
+                self.root = Internal(~NodeInternal::new(split_key, left, right));
+                self.insert(key, value)
+            }
+        }
+    }
+
+    pub fn pop(&mut self, key: &K) -> Option<V>
+    {
+        match self.root.pop(key) {
+            (_, found, _) => found,
+        }
+    }
+
+    pub fn freeze(&mut self)
+    {
+        self.root.freeze()
+    }
+
+    pub fn unfreeze(&mut self)
+    {
+        self.root.unfreeze()
+    }
+
+    pub fn stat(&self) -> BTreeStat
+    {
+        self.root.stat()
     }
 }
