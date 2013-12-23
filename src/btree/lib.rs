@@ -915,9 +915,9 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableM
     {
         match self.find_mut(&key) {
             Some(v) => {
-                let mut old = default();
-                util::swap(&mut old, v);
-                return Some(old);
+                let mut value = value;
+                util::swap(&mut value, v);
+                return Some(value);
             },
             _ => ()
         }
