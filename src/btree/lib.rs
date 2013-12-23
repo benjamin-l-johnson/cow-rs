@@ -43,61 +43,9 @@ enum InsertAction<K> {
     InsertUnfreeze
 }
 
-pub struct BTreeStat {
-    mut_leaves: uint,
-    mut_nodes: uint,
-    immut_leaves: uint,
-    immut_nodes: uint,
-    items: uint,
-    unused: uint,
-    depth: uint
-}
-
 fn default<T: Default>() -> T
 {
     Default::default()
-}
-
-impl Zero for BTreeStat
-{
-    fn zero() -> BTreeStat
-    {
-        BTreeStat {
-            mut_leaves: 0u,
-            mut_nodes: 0u,
-            immut_leaves: 0u,
-            immut_nodes: 0u,
-            items: 0u,
-            unused: 0u,
-            depth: 0u
-        }
-    }
-
-    fn is_zero(&self) -> bool
-    {
-        self.mut_leaves.is_zero() &&
-        self.mut_nodes.is_zero() &&
-        self.immut_leaves.is_zero() &&
-        self.immut_nodes.is_zero() &&
-        self.items.is_zero() &&
-        self.unused.is_zero()
-    }
-}
-
-impl Add<BTreeStat, BTreeStat> for BTreeStat
-{
-    fn add(&self, other: &BTreeStat) -> BTreeStat
-    {
-        BTreeStat {
-            mut_leaves: self.mut_leaves + other.mut_leaves,
-            mut_nodes: self.mut_nodes + other.mut_nodes,
-            immut_leaves: self.immut_leaves + other.immut_leaves,
-            immut_nodes: self.immut_nodes + other.immut_nodes,
-            items: self.items + other.items,
-            unused: self.unused + other.unused,
-            depth: self.depth.max(&other.depth)
-        }
-    }
 }
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for Node<K, V>
@@ -215,38 +163,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
             },
             _ => {old}
         };
-    }
-
-    pub fn stat(&self) -> BTreeStat
-    {
-        let mut stat = match *self {
-            Empty => {
-                zero()
-            },
-            Leaf(ref leaf) => {
-                let mut stat = (*leaf).stat();
-                stat.mut_leaves += 1;
-                stat
-            },
-            Internal(ref node) => {
-                let mut stat = (*node).stat();
-                stat.mut_nodes += 1;
-                stat
-            },
-            SharedLeaf(ref leaf) => {
-                let mut stat = (*leaf).get().stat();
-                stat.immut_leaves += 1;
-                stat
-            },
-            SharedInternal(ref node) => {
-                let mut stat = (*node).get().stat();
-                stat.immut_nodes += 1;
-                stat
-            },
-        };
-
-        stat.depth += 1;
-        stat
     }
 
     fn len(&self) -> uint
@@ -670,15 +586,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         }
     }
 
-    fn stat(&self) -> BTreeStat
-    {
-        let mut stat: BTreeStat = zero();
-        for i in range(0, self.used) {
-            stat = stat.add(&self.children[i].stat());
-        }
-        stat
-    }
-
     fn len(&self) -> uint
     {
         let mut len = 0;
@@ -873,16 +780,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
         self.used =  LEAF_SIZE / 2;
 
         (right, self.keys[self.used-1].clone())
-    }
-
-    fn stat(&self) -> BTreeStat
-    {
-        let mut stat: BTreeStat = zero();
-
-        stat.items = self.used;
-        stat.unused = LEAF_SIZE - self.used;
-
-        stat
     }
 
     fn len(&self) -> uint
@@ -1113,10 +1010,5 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
     pub fn unfreeze(&mut self)
     {
         self.root.unfreeze()
-    }
-
-    pub fn stat(&self) -> BTreeStat
-    {
-        self.root.stat()
     }
 }
