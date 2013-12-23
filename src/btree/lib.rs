@@ -63,7 +63,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone fo
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
 {
-    pub fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
+    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         match *self {
             Empty => {
@@ -85,7 +85,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         }
     }
 
-    pub fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
+    fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
     {
         self.unfreeze();
         match *self {
@@ -104,7 +104,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         }        
     }
 
-    pub fn split(&mut self) -> (Node<K, V>, K)
+    fn split(&mut self) -> (Node<K, V>, K)
     {
         match *self {
             Leaf(ref mut leaf) => {
@@ -121,7 +121,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         }
     }
 
-    pub fn freeze(&mut self)
+    fn freeze(&mut self)
     {
         match *self {
             Empty | SharedLeaf(_) | SharedInternal(_) => return,
@@ -143,7 +143,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         };
     }
 
-    pub fn unfreeze(&mut self)
+    fn unfreeze(&mut self)
     {
         match *self {
             Empty | Internal(_) | Leaf(_) => return,
@@ -185,7 +185,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
         }     
     }
 
-    pub fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
+    fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
     {
         self.unfreeze();
 
@@ -929,8 +929,12 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableM
     fn pop(&mut self, key: &K) -> Option<V>
     {
         match self.root.pop(key) {
-            (_, found, _) => found,
-        }        
+            (_, found, false) => found,
+            (_, found, true) => {
+                self.root.lift();
+                found
+            }
+        }
     }
 
     fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
@@ -939,31 +943,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableM
     }
 
     fn insert(&mut self, key: K, value: V) -> bool
-    {
-        self.insert(key, value)
-    }
-}
-
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
-{
-    fn clone(&self) -> BTree<K, V>
-    {
-        BTree {
-            root: self.root.clone()
-        }    
-    }
-}
-
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
-{
-    pub fn new() -> BTree<K, V>
-    {
-        BTree {
-            root: Empty
-        }
-    }
-
-    pub fn insert(&mut self, key: K, value: V) -> bool
     {
         match self.root.insert(&key, &value) {
             InsertDone(update) => update,
@@ -997,25 +976,29 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
             }
         }
     }
+}
 
-    pub fn pop(&mut self, key: &K) -> Option<V>
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
+{
+    fn clone(&self) -> BTree<K, V>
     {
-        match self.root.pop(key) {
-            (_, found, false) => found,
-            (_, found, true) => {
-                self.root.lift();
-                found
-            }
+        BTree {
+            root: self.root.clone()
+        }    
+    }
+}
+
+impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
+{
+    pub fn new() -> BTree<K, V>
+    {
+        BTree {
+            root: Empty
         }
     }
 
     pub fn freeze(&mut self)
     {
         self.root.freeze()
-    }
-
-    pub fn unfreeze(&mut self)
-    {
-        self.root.unfreeze()
     }
 }
