@@ -144,6 +144,7 @@ fn pop_n(len: uint)
         assert!(btree.pop(&i).unwrap() == i);
         assert!(btree.find(&i).is_none());
     }
+
     assert!(0 == btree.len())
 }
 
