@@ -6,7 +6,6 @@ extern mod extra;
 use std::kinds::{Freeze, Send};
 use std::default::{Default};
 use std::util;
-use std::num::{Zero, zero};
 use extra::arc::Arc;
 
 static LEAF_SIZE: uint = 31;
@@ -169,7 +168,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
     {
         match *self {
             Empty => {
-                zero()
+                0u
             },
             Leaf(ref leaf) => {
                 leaf.len()
@@ -914,9 +913,17 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableMap<K, V> for BTree<K, V> {
     fn swap(&mut self, key: K, value: V) -> Option<V>
     {
-        let old = self.pop(&key);
+        match self.find_mut(&key) {
+            Some(v) => {
+                let mut old = default();
+                util::swap(&mut old, v);
+                return Some(old);
+            },
+            _ => ()
+        }
+
         self.insert(key, value);
-        old
+        None
     }
 
     fn pop(&mut self, key: &K) -> Option<V>
