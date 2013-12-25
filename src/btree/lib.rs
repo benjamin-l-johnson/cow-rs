@@ -653,6 +653,14 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
     {
         self.children[self.used-1].max_key()
     }
+
+    fn iter<'a>(&'a self) -> NodeIterator<'a, K, V>
+    {
+        NodeIterator {
+            idx: 0,
+            node: self
+        }
+    }
 }
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
@@ -843,6 +851,15 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
     {
         self.keys[self.used-1].clone()
     }
+
+
+    fn iter<'a>(&'a self) -> LeafIterator<'a, K, V>
+    {
+        LeafIterator {
+            idx: 0,
+            leaf: self
+        }
+    }
 }
 
 impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
@@ -1000,5 +1017,109 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K,
     pub fn freeze(&mut self)
     {
         self.root.freeze()
+    }
+
+    pub fn iter<'a>(&'a self) -> BTreeIterator<'a, K, V>
+    {
+        let (leaf, stack) = match self.root {
+            Leaf(ref l)           => (Some(l.iter()), ~[]),
+            SharedLeaf(ref l)     => (Some(l.get().iter()), ~[]),
+            Internal(ref n)       => (None, ~[n.iter()]),
+            SharedInternal(ref n) => (None, ~[n.get().iter()]),
+            Empty                 => (None, ~[])
+        };
+        BTreeIterator {
+            leaf: leaf,
+            stack: stack
+        }
+    }
+}
+
+struct NodeIterator<'a, K, V>
+{
+    idx: uint,
+    node: &'a NodeInternal<K, V>
+}
+
+impl<'a, K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<NodeIteratorRes<'a,K,V>> for NodeIterator<'a, K, V>
+{
+    fn next(&mut self) -> Option<NodeIteratorRes<'a,K,V>>
+    {
+        if self.idx < self.node.used {
+            let idx = self.idx;
+            self.idx += 1;
+            match self.node.children[idx] {
+                Leaf(ref l)           => Some(LeafIter(l.iter())),
+                SharedLeaf(ref l)     => Some(LeafIter(l.get().iter())),
+                Internal(ref n)       => Some(InternalIter(n.iter())),
+                SharedInternal(ref n) => Some(InternalIter(n.get().iter())),
+                Empty                 => None             
+            }
+        } else {
+            None
+        }
+    }
+}
+
+struct LeafIterator<'a, K, V>
+{
+    idx: uint,
+    leaf: &'a NodeLeaf<K, V>
+}
+
+impl<'a, K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for LeafIterator<'a, K, V>
+{
+    fn next(&mut self) -> Option<(&'a K, &'a V)>
+    {
+        if self.idx < self.leaf.used {
+            let idx = self.idx;
+            self.idx += 1;
+            Some((&self.leaf.keys[idx], &self.leaf.values[idx]))
+        } else {
+            None
+        }
+    }
+}
+
+struct BTreeIterator<'a, K, V>
+{
+    stack: ~[NodeIterator<'a, K, V>],
+    leaf: Option<LeafIterator<'a, K, V>>
+}
+
+enum NodeIteratorRes<'a, K, V>
+{
+    InternalIter(NodeIterator<'a, K, V>),
+    LeafIter(LeafIterator<'a, K, V>)
+}
+
+impl<'a, K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for BTreeIterator<'a, K, V>
+{
+    fn next(&mut self) -> Option<(&'a K, &'a V)>
+    {
+        loop {
+            let res = match self.leaf {
+                Some(ref mut    l) => l.next(),
+                None => None
+            };
+
+            if res.is_some() {
+                return res;
+            } else {
+                self.leaf = None;
+            }
+
+            if self.stack.len() == 0 {
+                return None;
+            } else {
+                match self.stack[self.stack.len()-1].next() {
+                    Some(InternalIter(node)) => self.stack.push(node),
+                    Some(LeafIter(leaf)) => self.leaf = Some(leaf),
+                    None => {
+                        let _ = self.stack.pop();
+                    }
+                };
+            }
+        }
     }
 }
