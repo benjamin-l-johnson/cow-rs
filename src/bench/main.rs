@@ -261,7 +261,7 @@ struct Bench {
 #[inline(always)]
 fn bench<T>(name: ~str, build: |~[uint]| -> T, insert: |uint, &~[uint]|, find: |uint, &T|, clone: |uint, &T|, iter: |uint, &T|) -> Bench
 {
-    let count = 26;
+    let count = 20;
 
     let mut out = ~[];
 
@@ -273,8 +273,8 @@ fn bench<T>(name: ~str, build: |~[uint]| -> T, insert: |uint, &~[uint]|, find: |
             insert_shuffle: (size as f64) / timed(size, shuffled, |x, y|{insert(x, y)}),
             find_shuffled: (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{find(x, y)}),
             find_forward: (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{find(x, y)}),
-            clone: (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{clone(x, y)}),
-            iter:  (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{iter(x, y)})
+            clone:  (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{clone(x, y)}),
+            iter: (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{iter(x, y)})
         };
 
         out.push(res);

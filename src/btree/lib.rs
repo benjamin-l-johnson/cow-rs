@@ -8,7 +8,7 @@ use std::default::{Default};
 use std::util;
 use extra::arc::Arc;
 
-static LEAF_SIZE: uint = 31;
+static LEAF_SIZE: uint = 63;
 static INTERNAL_SIZE: uint = 128;
 
 struct NodeLeaf<K, V> {
@@ -47,7 +47,7 @@ fn default<T: Default>() -> T
     Default::default()
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for Node<K, V>
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for Node<K, V>
 {
     fn clone(&self) -> Node<K, V>
     {
@@ -61,7 +61,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone fo
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
 {
     fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
@@ -300,7 +300,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, 
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
 {
     fn clone(&self) -> NodeLeaf<K, V>
     {
@@ -317,7 +317,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone fo
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInternal<K, V>
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInternal<K, V>
 {
     fn new(key: K, left: Node<K, V>, right: Node<K, V>) -> NodeInternal<K, V>
     {
@@ -512,19 +512,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         self.children[self.search(key)].find_mut(key)
     }
 
-    fn search_linear(&self, key: &K) -> uint
-    {
-        let mut idx = 0;
-        while idx < (self.used-1) {
-            if *key <= self.keys[idx] {
-                break;
-            }
-            idx += 1;
-        }
-        idx
-    }
-
-    fn search_bsec(&self, key: &K) -> uint
+    fn search(&self, key: &K) -> uint
     {
         let mut start = 0u;
         let mut end = self.used-2;
@@ -544,17 +532,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
         } else {
             start
         }
-    }
-
-    fn search(&self, key: &K) -> uint
-    {
-        let out = if self.used < 16 {
-            self.search_linear(key)
-        } else {
-            self.search_bsec(key)
-        };
-
-        out
     }
 
     fn split(&mut self) -> (NodeInternal<K, V>, K)
@@ -663,7 +640,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInte
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
 {
     fn new() -> NodeLeaf<K, V>
     {
@@ -672,26 +649,57 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
             keys: [default(), default(), default(), default(), default(), default(), default(), default(),
                    default(), default(), default(), default(), default(), default(), default(), default(),
                    default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
+                   default(), default(), default(), default(), default(), default(), default(), default(),
                    default(), default(), default(), default(), default(), default(), default()],
             values: [default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default(), default(),
+                     default(), default(), default(), default(), default(), default(), default(), default(),
                      default(), default(), default(), default(), default(), default(), default(), default(),
                      default(), default(), default(), default(), default(), default(), default(), default(),
                      default(), default(), default(), default(), default(), default(), default()]
         }
     }
 
+    #[inline(always)]
+    fn search_key(&self, key: &K) -> (bool, uint)
+    {
+        let mut start = 0u;
+        let mut end = self.used;
+
+        while end > start {
+            let mid = start + ((end-start) / 2);
+
+            match key.cmp(&self.keys[mid]) {
+                Less => end = mid,
+                Equal => return (true, mid),
+                Greater => start = mid+1,
+            }
+        }
+        (false, start)
+    }
+
+
+    #[inline(always)]
+    fn search(&self, key: &K) -> Option<uint>
+    {
+        match self.search_key(key) {
+            (true, idx) => Some(idx),
+            (false, _) => None
+        }
+    }
+
+
     fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         if self.used == LEAF_SIZE {
             Split
         } else {
-            let mut insert = 0;
-            while insert < self.used {
-                if *key <= self.keys[insert] {
-                    break;
-                }
-                insert += 1;
-            }
+            let (_, insert) = self.search_key(key);
 
             // update
             if insert != self.used && *key == self.keys[insert] {
@@ -716,16 +724,6 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
                 }
             }
         }
-    }
-
-    fn search(&self, key: &K) -> Option<uint>
-    {
-        for i in range(0, self.used) {
-            if *key == self.keys[i] {
-                return Some(i);
-            }
-        }
-        None
     }
 
     fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
@@ -862,7 +860,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
 {
     fn clone(&self) -> NodeInternal<K, V>
     {
@@ -882,14 +880,14 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone fo
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Container for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Container for BTree<K, V> {
     fn len(&self) -> uint
     {
         self.root.len()
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V> for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V> for BTree<K, V> {
     fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
         let mut target = &self.root;
@@ -920,14 +918,14 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable for BTree<K, V> {
     fn clear(&mut self)
     {
         self.root = Empty;
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableMap<K, V> for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableMap<K, V> for BTree<K, V> {
     fn swap(&mut self, key: K, value: V) -> Option<V>
     {
         match self.find_mut(&key) {
@@ -995,7 +993,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> MutableM
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
 {
     fn clone(&self) -> BTree<K, V>
     {
@@ -1005,7 +1003,7 @@ impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Clone fo
     }
 }
 
-impl<K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
+impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
 {
     pub fn new() -> BTree<K, V>
     {
@@ -1041,7 +1039,7 @@ struct NodeIterator<'a, K, V>
     node: &'a NodeInternal<K, V>
 }
 
-impl<'a, K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<NodeIteratorRes<'a,K,V>> for NodeIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<NodeIteratorRes<'a,K,V>> for NodeIterator<'a, K, V>
 {
     fn next(&mut self) -> Option<NodeIteratorRes<'a,K,V>>
     {
@@ -1067,7 +1065,7 @@ struct LeafIterator<'a, K, V>
     leaf: &'a NodeLeaf<K, V>
 }
 
-impl<'a, K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for LeafIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for LeafIterator<'a, K, V>
 {
     fn next(&mut self) -> Option<(&'a K, &'a V)>
     {
@@ -1093,7 +1091,7 @@ enum NodeIteratorRes<'a, K, V>
     LeafIter(LeafIterator<'a, K, V>)
 }
 
-impl<'a, K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for BTreeIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for BTreeIterator<'a, K, V>
 {
     #[inline(always)]
     fn next(&mut self) -> Option<(&'a K, &'a V)>
