@@ -1095,6 +1095,7 @@ enum NodeIteratorRes<'a, K, V>
 
 impl<'a, K: Default+Clone+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for BTreeIterator<'a, K, V>
 {
+    #[inline(always)]
     fn next(&mut self) -> Option<(&'a K, &'a V)>
     {
         loop {

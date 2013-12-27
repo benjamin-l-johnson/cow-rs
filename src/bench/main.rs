@@ -1,3 +1,5 @@
+#[feature(macro_rules)];
+
 extern mod btree;
 extern mod extra;
 
@@ -241,65 +243,81 @@ fn tmap_iter(_: uint, tup: &(~[uint], TreeMap<uint, uint>))
     }
 }
 
+struct BenchResult {
+    size: uint,
+    insert_shuffle: f64,
+    insert_forward: f64,
+    find_shuffled: f64,
+    find_forward: f64,
+    clone: f64,
+    iter: f64
+}
+
+struct Bench {
+    name: ~str,
+    result: ~[BenchResult]
+}
+
 #[inline(always)]
-fn bench<T>(name: &str, build: |~[uint]| -> T, insert: |uint, &~[uint]|, find: |uint, &T|, clone: |uint, &T|, iter: |uint, &T|)
+fn bench<T>(name: ~str, build: |~[uint]| -> T, insert: |uint, &~[uint]|, find: |uint, &T|, clone: |uint, &T|, iter: |uint, &T|) -> Bench
 {
     let count = 26;
 
-    println!("|{:s}|", name);
-    print!("|size           |");
-    for i in range(0, count) {
-        let count = 1<<i;
-        print!("{:9.0}|", count);
-    }
-    println!("");
+    let mut out = ~[];
 
-    print!("|insert shuffled|");
-    for i in range(0, count) {
-        let count = 1<<i;
-        print!("{:9.0}|", (count as f64) / timed(count, shuffled, |x, y|{insert(x, y)}));
-    }
-    println!("");
+    for size in range(0, count) {
+        let size = 1<<size;
+        let res = BenchResult{
+            size: size,
+            insert_forward: (size as f64) / timed(size, forward, |x, y|{insert(x, y)}),
+            insert_shuffle: (size as f64) / timed(size, shuffled, |x, y|{insert(x, y)}),
+            find_shuffled: (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{find(x, y)}),
+            find_forward: (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{find(x, y)}),
+            clone: (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{clone(x, y)}),
+            iter:  (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{iter(x, y)})
+        };
 
-    print!("|find shuffled  |");
-    for i in range(0, count) {
-        let count = 1<<i;
-        print!("{:9.0}|", (count as f64) / timed(count, |count| {build(shuffled(count))}, |x, y|{find(x, y)}));
+        out.push(res);
     }
-    println!("");
-
-    print!("|insert forward |");
-    for i in range(0, count) {
-        let count = 1<<i;
-        print!("{:9.0}|", (count as f64) / timed(count, forward, |x, y|{insert(x, y)}));
+    
+    Bench {
+        name: name,
+        result: out
     }
-    println!("");
-
-    print!("|find forward   |");
-    for i in range(0, count) {
-        let count = 1<<i;
-        print!("{:9.0}|", (count as f64) / timed(count, |count| {build(forward(count))}, |x, y|{find(x, y)}));
-    }
-    println!("");
-
-    print!("|clone          |");
-    for i in range(0, count) {
-        let count = 1<<i;
-        print!("{:9.0}|", (count as f64) / timed(count, |count| {build(shuffled(count))}, |x, y|{clone(x, y)}));
-    }
-    println!("");
-
-    print!("|iter forward   |");
-    for i in range(0, count) {
-        let count = 1<<i;
-        print!("{:9.0}|", (count as f64) / timed(count, |count| {build(forward(count))}, |x, y|{iter(x, y)}));
-    }
-    println!("");
 }
+
+macro_rules! print_table(
+    ($name:expr, $table:expr, $row:ident) => ({
+        println!("{:s}", $name);
+        for x in $table.slice(0, 1).iter() {
+            print!("size,");
+            for y in x.result.iter() {
+                print!("{:0.0},", y.size);
+            }
+            println!("");
+        }
+        for x in $table.iter() {
+            print!("{},", x.name);
+            for y in x.result.iter() {
+                print!("{:0.0},", y.$row);
+            }
+            println!("");
+        }
+        println("");
+    })
+)
 
 fn main()
 {
-    bench("BTree", btree_build, btree_insert, btree_find, btree_clone, btree_iter);
-    bench("HashMap", hmap_build, hmap_insert, hmap_find, hmap_clone, hmap_iter);
-    bench("TreeMap", tmap_build, tmap_insert, tmap_find, tmap_clone, tmap_iter);
+    let mut  table = ~[];
+    table.push(bench(~"Btree", btree_build, btree_insert, btree_find, btree_clone, btree_iter));
+    table.push(bench(~"HashMap", hmap_build, hmap_insert, hmap_find, hmap_clone, hmap_iter));
+    table.push(bench(~"TreeMap", tmap_build, tmap_insert, tmap_find, tmap_clone, tmap_iter));
+
+    print_table!("insert shuffled", table, insert_shuffle);
+    print_table!("insert forward", table, insert_forward);
+    print_table!("find shuffled", table, find_shuffled)
+    print_table!("find forward", table, find_forward);
+    print_table!("clone", table, clone);
+    print_table!("iterator", table, iter);
 }
