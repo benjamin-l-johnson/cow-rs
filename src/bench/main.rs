@@ -6,7 +6,7 @@ extern mod extra;
 use btree::BTree;
 use extra::time::precise_time_s;
 use std::rand::{Rng, IsaacRng, SeedableRng};
-
+use std::iter::range_step;
 use std::hashmap::HashMap;
 use extra::treemap::TreeMap;
 
@@ -73,7 +73,6 @@ fn btree_build(build_arr: ~[uint]) -> (~[uint], BTree<uint, uint>)
     for &node in build_arr.iter() {
         btree.insert(node, node);
     }
-
     (build_arr, btree)
 }
 
@@ -124,7 +123,27 @@ fn btree_iter(_: uint, tup: &(~[uint], BTree<uint, uint>))
     }
 }
 
+#[inline(always)]
+fn btree_freeze_build(build_arr: ~[uint]) -> (~[uint], BTree<uint, uint>)
+{
+    let mut btree = BTree::new();
+    for &node in build_arr.iter() {
+        btree.insert(node, node);
+    }
+    btree.freeze();
+    (build_arr, btree)
+}
 
+
+#[inline(always)]
+fn btree_freeze_insert(_: uint, data: &~[uint])
+{
+    let mut btree = BTree::new();
+    for &node in data.iter() {
+        btree.insert(node, node);
+    }
+    btree.freeze();
+}
 
 #[inline(always)]
 fn hmap_build(build_arr: ~[uint]) -> (~[uint], HashMap<uint, uint>)
@@ -261,11 +280,12 @@ struct Bench {
 #[inline(always)]
 fn bench<T>(name: ~str, build: |~[uint]| -> T, insert: |uint, &~[uint]|, find: |uint, &T|, clone: |uint, &T|, iter: |uint, &T|) -> Bench
 {
-    let count = 20;
+    let every = 16;
+    let every_other = 26;
 
     let mut out = ~[];
 
-    for size in range(0, count) {
+    for size in range(0, every) {
         let size = 1<<size;
         let res = BenchResult{
             size: size,
@@ -273,13 +293,28 @@ fn bench<T>(name: ~str, build: |~[uint]| -> T, insert: |uint, &~[uint]|, find: |
             insert_shuffle: (size as f64) / timed(size, shuffled, |x, y|{insert(x, y)}),
             find_shuffled: (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{find(x, y)}),
             find_forward: (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{find(x, y)}),
-            clone:  (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{clone(x, y)}),
+            clone: (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{clone(x, y)}),
             iter: (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{iter(x, y)})
         };
 
         out.push(res);
     }
-    
+
+    for size in range_step(every, every_other, 2) {
+        let size = 1<<size;
+        let res = BenchResult{
+            size: size,
+            insert_forward: (size as f64) / timed(size, forward, |x, y|{insert(x, y)}),
+            insert_shuffle: (size as f64) / timed(size, shuffled, |x, y|{insert(x, y)}),
+            find_shuffled: (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{find(x, y)}),
+            find_forward: (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{find(x, y)}),
+            clone: (size as f64) / timed(size, |size| {build(shuffled(size))}, |x, y|{clone(x, y)}),
+            iter: (size as f64) / timed(size, |size| {build(forward(size))}, |x, y|{iter(x, y)})
+        };
+
+        out.push(res);
+    }
+
     Bench {
         name: name,
         result: out
@@ -311,6 +346,7 @@ fn main()
 {
     let mut  table = ~[];
     table.push(bench(~"Btree", btree_build, btree_insert, btree_find, btree_clone, btree_iter));
+    table.push(bench(~"Btree frozen", btree_freeze_build, btree_freeze_insert, btree_find, btree_clone, btree_iter));
     table.push(bench(~"HashMap", hmap_build, hmap_insert, hmap_find, hmap_clone, hmap_iter));
     table.push(bench(~"TreeMap", tmap_build, tmap_insert, tmap_find, tmap_clone, tmap_iter));
 

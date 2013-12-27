@@ -514,23 +514,26 @@ impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze>
         self.children[self.search(key)].find_mut(key)
     }
 
+    #[inline(always)]
     fn search(&self, key: &K) -> uint
     {
         let mut start = 0u;
-        let mut end = self.used-2;
+        let mut end = self.used-1;
 
         while end > start {
             let mid = start + ((end-start) / 2);
 
-            if *key > self.keys[mid] {
-                start = mid+1;
-            } else {
-                end = mid;
+            match key.cmp(&self.keys[mid]) {
+                Less => end = mid,
+                Equal => return mid,
+                Greater => start = mid+1,
             }
         }
-
-        if self.used - 2 == start && *key > self.keys[start] {
-            start + 1
+        if start != self.used-1 {
+            match key.cmp(&self.keys[start]) {
+                Less | Equal => start,
+                Greater => start+1,
+            }
         } else {
             start
         }
@@ -890,6 +893,7 @@ impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze>
 }
 
 impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V> for BTree<K, V> {
+    #[inline(always)]
     fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
         let mut target = &self.root;
@@ -954,6 +958,7 @@ impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze>
         }
     }
 
+    #[inline(always)]
     fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
     {
         self.root.find_mut(key)
