@@ -473,12 +473,14 @@ impl<K: Default+Clone+TotalOrd+Ord+Eq+Send+Freeze, V: Default+Clone+Send+Freeze>
 
         self.children[insert].merge(child);
         self.keys[insert] = self.children[insert].max_key();
-        self.keys[insert+1] = default();
+        if insert+1 != self.used-1  {
+            self.keys[insert+1] = default();
+        }
 
-        for i in range(insert+1, self.used) {
+        for i in range(insert+1, self.used-1) {
             self.children.swap(i, i+1);
         }
-        for i in range(insert+1, self.used-1) {
+        for i in range(insert+1, self.used-2) {
             self.keys.swap(i, i+1);
         }
         self.used -= 1;
