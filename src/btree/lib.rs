@@ -39,8 +39,7 @@ pub struct BTree<K, V> {
 enum InsertAction<K> {
     InsertDone(bool),
     Split,
-    InsertUpdateLeft(K),
-    InsertUnfreeze
+    InsertUpdateLeft(K)
 }
 
 fn default<T: Default>() -> T
@@ -52,10 +51,20 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
 {
     fn clone(&self) -> Node<K, V>
     {
-        match *self {
-            Empty => Empty,
-            Internal(ref node) => Internal(node.clone()),
-            Leaf(ref leaf) => Leaf(leaf.clone()), 
+        unsafe {
+            match *self {
+                Empty => Empty,
+                Internal(node) => {
+                    let tmp: &mut NodeInternal<K, V> = transmute(node);
+                    tmp.inc_ref();
+                    Internal(node)
+                },
+                Leaf(leaf) => {
+                    let tmp: &mut NodeLeaf<K, V> = transmute(leaf);
+                    tmp.inc_ref();
+                    Leaf(leaf)
+                }
+            }
         }
     }
 }
@@ -64,6 +73,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
 {
     unsafe fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
+        self.mutable();
+
         match *self {
             Empty => {
                 let leaf: ~NodeLeaf<K, V> = ~NodeLeaf::new();
@@ -83,7 +94,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
 
     unsafe fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
     {
-        self.unfreeze();
+        self.mutable();
+
         match *self {
             Empty => {
                 (None, None, false)
@@ -137,7 +149,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
 
     unsafe fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
     {
-        self.unfreeze();
+        self.mutable();
 
         match *self {
             Empty => {
@@ -157,7 +169,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     // move the lowest key from other to self iff node is has extra keys
     unsafe fn rotate_right(&mut self, src: &mut Node<K, V>) -> bool
     {
-        src.unfreeze();
+        src.mutable();
+
         match (self, src) {
             (&Leaf(ref mut sink), &Leaf(ref mut src)) => {
                 let src: &mut NodeLeaf<K, V> = transmute(*src);
@@ -178,7 +191,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     // move highest key from src to self iff node is has extra keys
     unsafe fn rotate_left(&mut self, src: &mut Node<K, V>) -> bool
     {
-        src.unfreeze();
+        src.mutable();
+
         match (self, src) {
             (&Leaf(ref mut sink), &Leaf(ref mut src)) => {
                 let src: &mut NodeLeaf<K, V> = transmute(*src);
@@ -199,6 +213,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     // move highest key from src to self iff node is has extra keys
     unsafe fn merge(&mut self, src: Node<K, V>)
     {
+        let mut src = src;
+        src.mutable();
         match (self, src) {
             (&Leaf(ref mut sink), Leaf(ref mut src)) => {
                 let tmp: &mut NodeLeaf<K, V> = transmute(*src);
@@ -263,9 +279,34 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
         }
     }
 
-    unsafe fn unfreeze(&self) {}
+    unsafe fn mutable(&mut self)
+    {
+        let dup = match *self {
+            Empty => true,
+            Leaf(ref mut leaf) => {
+                let leaf: &NodeLeaf<K, V> = transmute(*leaf);
+                leaf.mutable()
+            },
+            Internal(ref mut node) => {
+                let node: &NodeInternal<K, V> = transmute(*node);
+                node.mutable()
+            }
+        };
 
-    unsafe fn freeze(&self) {}
+        if !dup {
+            let mut new = match *self {
+                Empty => Empty,
+                Leaf(leaf) => {
+                    Leaf(transmute(~(*leaf).clone()))
+                },
+                Internal(node) => {
+                    Internal(transmute(~(*node).clone()))
+                }
+            };
+            util::swap(&mut new, self);
+            new.dec_ref();
+        }
+    }
 }
 
 impl<K, V> Node<K, V>
@@ -398,10 +439,6 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
 
         match self.children[idx].insert(key, value) {
             InsertDone(bool) => (InsertDone(bool)),
-            InsertUnfreeze => {
-                self.children[idx].unfreeze();
-                self.insert(key, value)
-            }
             Split => {
                 if self.used == INTERNAL_SIZE {
                     Split
@@ -557,13 +594,6 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         (right, key)
     }
 
-    unsafe fn freeze_children(&mut self)
-    {
-        for i in range(0, self.used) {
-            self.children[i].freeze();
-        }
-    }
-
     unsafe fn len(&self) -> uint
     {
         let mut len = 0;
@@ -668,6 +698,12 @@ impl<K, V> NodeInternal<K, V>
         } else {
             false
         }
+    }
+
+    #[inline(always)]
+    unsafe fn mutable(&self) -> bool
+    {
+        (*self).ref_count.load(Acquire) == 1
     }
 }
 
@@ -930,6 +966,12 @@ impl<K, V> NodeLeaf<K, V>
         let old_count = (*mut_self).ref_count.fetch_sub(1, SeqCst);
         old_count == 1
     }
+
+    #[inline(always)]
+    unsafe fn mutable(&self) -> bool
+    {
+        (*self).ref_count.load(Acquire) == 1
+    }
 }
 
 impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
@@ -1047,10 +1089,6 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
                 // on an insert, not an update so this
                 // can return false
                 InsertUpdateLeft(_) => false,
-                InsertUnfreeze => {
-                    self.root.unfreeze();
-                    self.insert(key, value)
-                }
                 Split => {
                     let (split_key, right) = match self.root {
                         Leaf(ref mut leaf) => {
@@ -1097,13 +1135,6 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<
     {
         BTree {
             root: Empty
-        }
-    }
-
-    pub fn freeze(&mut self)
-    {
-        unsafe {
-            self.root.freeze()
         }
     }
 

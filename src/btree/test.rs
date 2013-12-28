@@ -389,8 +389,6 @@ fn freeze()
         check(&btree, i, i);
     }
 
-    btree.freeze();
-
     for i in range(0, 1100u) {
         check(&btree, i, i);
     }    
@@ -408,8 +406,6 @@ fn freeze_set()
     for i in range(0, 1100u) {
         check(&btree, i, i);
     }
-
-    btree.freeze();
 
     for i in range(1100u, 2200u) {
         btree.insert(i, i);
@@ -432,8 +428,6 @@ fn freeze_set2()
     for i in range(0, 1100u) {
         check(&btree, i, i);
     }
-
-    btree.freeze();
 
     let old = btree.clone();
 
