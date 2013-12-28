@@ -6,29 +6,30 @@ extern mod extra;
 use std::kinds::{Freeze, Send};
 use std::default::{Default};
 use std::util;
-use extra::arc::Arc;
+use std::sync::atomics::{AtomicUint, SeqCst, Acquire};
+use std::cast::{transmute, transmute_mut};
 
 static LEAF_SIZE: uint = 63;
 static INTERNAL_SIZE: uint = 128;
 
 struct NodeLeaf<K, V> {
+    ref_count: AtomicUint,
     used:   uint,
     keys:   [K, ..LEAF_SIZE],
     values: [V, ..LEAF_SIZE] 
 }
 
 struct NodeInternal<K, V> {
-    used:     uint,
-    keys:     [K, ..INTERNAL_SIZE-1],
-    children: [Node<K, V>, ..INTERNAL_SIZE]
+    ref_count: AtomicUint,
+    used:      uint,
+    keys:      [K, ..INTERNAL_SIZE-1],
+    children:  [Node<K, V>, ..INTERNAL_SIZE]
 }
 
 enum Node<K, V> {
     Empty,
-    Internal(~NodeInternal<K, V>),
-    Leaf(~NodeLeaf<K, V>),
-    SharedInternal(Arc<~NodeInternal<K, V>>),
-    SharedLeaf(Arc<~NodeLeaf<K, V>>)
+    Internal(*mut NodeInternal<K, V>),
+    Leaf(*mut NodeLeaf<K, V>),
 }
 
 pub struct BTree<K, V> {
@@ -55,37 +56,32 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
             Empty => Empty,
             Internal(ref node) => Internal(node.clone()),
             Leaf(ref leaf) => Leaf(leaf.clone()), 
-            SharedInternal(ref node) => SharedInternal(node.clone()),
-            SharedLeaf(ref leaf) => SharedLeaf(leaf.clone()), 
         }
     }
 }
 
 impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
 {
-    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
+    unsafe fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         match *self {
             Empty => {
-                *self = Leaf(~NodeLeaf::new());
+                let leaf: ~NodeLeaf<K, V> = ~NodeLeaf::new();
+                *self = Leaf(transmute(leaf));
                 self.insert(key, value)
             },
             Leaf(ref mut leaf) => {
-                (*leaf).insert(key, value)
+                let leaf: &mut NodeLeaf<K, V> = transmute(*leaf);
+                leaf.insert(key, value)
             },
             Internal(ref mut node) => {
-                (*node).insert(key, value)
-            },
-            SharedLeaf(_) => {
-                InsertUnfreeze
-            },
-            SharedInternal(_) => {
-                InsertUnfreeze
-            },
+                let node: &mut NodeInternal<K, V> = transmute(*node);
+                node.insert(key, value)
+            }
         }
     }
 
-    fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
+    unsafe fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
     {
         self.unfreeze();
         match *self {
@@ -93,27 +89,28 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
                 (None, None, false)
             },
             Leaf(ref mut leaf) => {
-                (*leaf).pop(key)
+                let leaf: &mut NodeLeaf<K, V> = transmute(*leaf);
+                leaf.pop(key)
             },
             Internal(ref mut node) => {
-                (*node).pop(key)
-            },
-            SharedLeaf(_) | SharedInternal(_) => {
-                fail!("should have been unfrozen");
-            },
+                let node: &mut NodeInternal<K, V> = transmute(*node);
+                node.pop(key)
+            }
         }        
     }
 
-    fn split(&mut self) -> (Node<K, V>, K)
+    unsafe fn split(&mut self) -> (Node<K, V>, K)
     {
         match *self {
             Leaf(ref mut leaf) => {
-                let (leaf, key) = (*leaf).split();
-                (Leaf(~leaf), key)
+                let leaf: &mut NodeLeaf<K, V> = transmute(*leaf);
+                let (leaf, key) = leaf.split();
+                (Leaf(transmute(~leaf)), key)
             },
             Internal(ref mut node) => {
-                let (node, key) = (*node).split();
-                (Internal(~node), key)
+                let node: &mut NodeInternal<K, V> = transmute(*node);
+                let (node, key) = node.split();
+                (Internal(transmute(~node)), key)
             },
             _ => {
                 fail!("unsupported split");
@@ -121,71 +118,24 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
         }
     }
 
-    fn freeze(&mut self)
-    {
-        match *self {
-            Empty | SharedLeaf(_) | SharedInternal(_) => return,
-            Internal(_) | Leaf(_) => ()
-        };
-
-        let mut old = Empty;
-        util::swap(&mut old, self);
-
-        *self = match old {
-            Internal(mut node) => {
-                node.freeze_children();
-                SharedInternal(Arc::new(node))
-            },
-            Leaf(leaf) => {
-                SharedLeaf(Arc::new(leaf))
-            },
-            _ => {fail!("This should not have been reached")}
-        };
-    }
-
-    fn unfreeze(&mut self)
-    {
-        match *self {
-            Empty | Internal(_) | Leaf(_) => return,
-            SharedLeaf(_) | SharedInternal(_) => ()
-        };
-
-        let mut old = Empty;
-        util::swap(&mut old, self);
-
-        *self = match old {
-            SharedInternal(node) => {
-                Internal(node.get().clone())
-            },
-            SharedLeaf(leaf) => {
-                Leaf(leaf.get().clone())
-            },
-            _ => {old}
-        };
-    }
-
-    fn len(&self) -> uint
+    unsafe fn len(&self) -> uint
     {
         match *self {
             Empty => {
                 0u
             },
             Leaf(ref leaf) => {
+                let leaf: &NodeLeaf<K, V> = transmute(*leaf);
                 leaf.len()
             },
             Internal(ref node) => {
+                let node: &NodeInternal<K, V> = transmute(*node);
                 node.len()
-            },
-            SharedLeaf(ref leaf) => {
-                leaf.get().len()
-            },
-            SharedInternal(ref node) => {
-                node.get().len()
-            },
+            }
         }     
     }
 
-    fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
+    unsafe fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
     {
         self.unfreeze();
 
@@ -194,27 +144,30 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
                 None
             },
             Leaf(ref mut leaf) => {
-                (*leaf).find_mut(key)
+                let leaf: &mut NodeLeaf<K, V> = transmute(*leaf);
+                leaf.find_mut(key)
             },
             Internal(ref mut node) => {
-                (*node).find_mut(key)
-            },
-            SharedLeaf(_) | SharedInternal(_) => {
-                fail!("this should not be shared!")
+                let node: &mut NodeInternal<K, V> = transmute(*node);
+                node.find_mut(key)
             },
         }
     }
 
     // move the lowest key from other to self iff node is has extra keys
-    fn rotate_right(&mut self, src: &mut Node<K, V>) -> bool
+    unsafe fn rotate_right(&mut self, src: &mut Node<K, V>) -> bool
     {
         src.unfreeze();
         match (self, src) {
             (&Leaf(ref mut sink), &Leaf(ref mut src)) => {
-                sink.rotate_right(&mut (**src))
+                let src: &mut NodeLeaf<K, V> = transmute(*src);
+                let sink: &mut NodeLeaf<K, V> = transmute(*sink);
+                sink.rotate_right(src)
             },
             (&Internal(ref mut sink), &Internal(ref mut src)) => {
-                sink.rotate_right(&mut (**src))
+                let src: &mut NodeInternal<K, V> = transmute(*src);
+                let sink: &mut NodeInternal<K, V> = transmute(*sink);
+                sink.rotate_right(src)
             },
             (_, _) => {
                 fail!("both nodes should be of the same type");
@@ -223,15 +176,19 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     }
 
     // move highest key from src to self iff node is has extra keys
-    fn rotate_left(&mut self, src: &mut Node<K, V>) -> bool
+    unsafe fn rotate_left(&mut self, src: &mut Node<K, V>) -> bool
     {
         src.unfreeze();
         match (self, src) {
             (&Leaf(ref mut sink), &Leaf(ref mut src)) => {
-                sink.rotate_left(&mut (**src))
+                let src: &mut NodeLeaf<K, V> = transmute(*src);
+                let sink: &mut NodeLeaf<K, V> = transmute(*sink);
+                sink.rotate_left(src)
             },
             (&Internal(ref mut sink), &Internal(ref mut src)) => {
-                sink.rotate_left(&mut (**src))
+                let src: &mut NodeInternal<K, V> = transmute(*src);
+                let sink: &mut NodeInternal<K, V> = transmute(*sink);
+                sink.rotate_left(src)
             },
             (_, _) => {
                 fail!("both nodes should be of the same type");
@@ -240,14 +197,18 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     }
 
     // move highest key from src to self iff node is has extra keys
-    fn merge(&mut self, src: Node<K, V>)
+    unsafe fn merge(&mut self, src: Node<K, V>)
     {
         match (self, src) {
             (&Leaf(ref mut sink), Leaf(ref mut src)) => {
-                sink.merge(*src)
+                let tmp: &mut NodeLeaf<K, V> = transmute(*src);
+                let sink: &mut NodeLeaf<K, V> = transmute(*sink);
+                sink.merge(tmp);
             },
             (&Internal(ref mut sink), Internal(ref mut src)) => {
-                sink.merge(*src)
+                let tmp: &mut NodeInternal<K, V> = transmute(*src);
+                let sink: &mut NodeInternal<K, V> = transmute(*sink);
+                sink.merge(tmp);
             },
             (_, _) => {
                 fail!("both nodes should be of the same type");
@@ -255,32 +216,30 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
         }
     }
 
-    fn max_key(&self) -> K
+    unsafe fn max_key(&self) -> K
     {
         match *self {
             Leaf(ref leaf) => {
-                (*leaf).max_key()
+                let leaf: &NodeLeaf<K, V> = transmute(*leaf);
+                leaf.max_key()
             },
             Internal(ref node) => {
-                (*node).max_key()
-            },
-            SharedLeaf(ref leaf) => {
-                (*leaf).get().max_key()
-            },
-            SharedInternal(ref node) => {
-                (*node).get().max_key()
+                let node: &NodeInternal<K, V> = transmute(*node);
+                node.max_key()
             },
             Empty => fail!("invalid node")
         }
     }
 
-    fn lift(&mut self)
+    unsafe fn lift(&mut self)
     {
         let depleted = match *self {
             Internal(ref node) => {
+                let node: &NodeInternal<K, V> = transmute(*node);
                 node.used == 1
             },
             Leaf(ref leaf) => {
+                let leaf: &NodeLeaf<K, V> = transmute(*leaf);
                 leaf.used == 0
             },
             _ => false
@@ -290,30 +249,63 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
             let mut child = Empty;
             match *self {
                 Internal(ref mut node) => {
-                    util::swap(&mut child, &mut node.children[0])
+                    let tmp: &mut NodeInternal<K, V> = transmute(*node);
+                    util::swap(&mut child, &mut tmp.children[0]);
+                    let _: ~NodeInternal<K, V> = transmute(*node);
+
                 },
-                Leaf(_) => (),
+                Leaf(ref node) => {
+                    let _: ~NodeLeaf<K, V> = transmute(*node);
+                },
                 _ => fail!("invalid node")
             }
             *self = child;
         }
     }
+
+    unsafe fn unfreeze(&self) {}
+
+    unsafe fn freeze(&self) {}
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
+impl<K, V> Node<K, V>
 {
-    fn clone(&self) -> NodeLeaf<K, V>
+    #[inline(always)]
+    unsafe fn inc_ref(&self)
     {
-        let mut new = NodeLeaf::new();
-
-        new.used = self.used;
-
-        for i in range(0, self.used) {
-            new.values[i] = self.values[i].clone();
-            new.keys[i] = self.keys[i].clone();
+        match *self {
+            Leaf(ref leaf) => {
+                let leaf: &mut NodeLeaf<K, V> = transmute(*leaf);
+                leaf.inc_ref()
+            },
+            Internal(ref node) => {
+                let node: &mut NodeInternal<K, V> = transmute(*node);
+                node.inc_ref()
+            }
+            Empty => ()
         }
+    }
 
-        new
+    #[inline(always)]
+    unsafe fn dec_ref(&self)
+    {
+        match *self {
+            Leaf(ref leaf) => {
+                let leaf: &mut NodeLeaf<K, V> = transmute(*leaf);
+                // last to have access to the node
+                if leaf.dec_ref() {
+                    let _: ~NodeLeaf<K, V> = transmute(leaf);
+                }
+            },
+            Internal(ref node) => {
+                let node: &mut NodeInternal<K, V> = transmute(*node);
+                // last to have access to the node
+                if node.dec_ref() {
+                    let _: ~NodeInternal<K, V> = transmute(node);
+                }
+            }
+            Empty => ()
+        }
     }
 }
 
@@ -322,6 +314,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
     fn new(key: K, left: Node<K, V>, right: Node<K, V>) -> NodeInternal<K, V>
     {
         NodeInternal {
+            ref_count: AtomicUint::new(1),
             used: 2,
             keys: [key,       default(), default(), default(), default(), default(), default(), default(),
                    default(), default(), default(), default(), default(), default(), default(), default(),
@@ -362,6 +355,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
     fn new_empty() -> NodeInternal<K, V>
     {
         NodeInternal {
+            ref_count: AtomicUint::new(1),
             used: 0,
             keys: [default(), default(), default(), default(), default(), default(), default(), default(),
                    default(), default(), default(), default(), default(), default(), default(), default(),
@@ -398,7 +392,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
-    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
+    unsafe fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         let idx = self.search(key);
 
@@ -442,7 +436,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
-    fn redist(&mut self, idx: uint)
+    unsafe fn redist(&mut self, idx: uint)
     {
         if idx + 1 != self.used {
             let (left, right) = self.children.mut_split_at(idx+1);
@@ -473,6 +467,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
 
         self.children[insert].merge(child);
         self.keys[insert] = self.children[insert].max_key();
+
         if insert+1 != self.used-1  {
             self.keys[insert+1] = default();
         }
@@ -484,9 +479,11 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
             self.keys.swap(i, i+1);
         }
         self.used -= 1;
+
+        child.dec_ref();
     }
 
-    fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
+    unsafe fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
     {
         let idx = self.search(key);
         let (key, value, needs_merge) = self.children[idx].pop(key);
@@ -509,13 +506,13 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         (key, value, self.used < INTERNAL_SIZE / 2)
     }
 
-    fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
+    unsafe fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
     {
         self.children[self.search(key)].find_mut(key)
     }
 
     #[inline(always)]
-    fn search(&self, key: &K) -> uint
+    unsafe fn search(&self, key: &K) -> uint
     {
         let mut start = 0u;
         let mut end = self.used-1;
@@ -539,7 +536,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
-    fn split(&mut self) -> (NodeInternal<K, V>, K)
+    unsafe fn split(&mut self) -> (NodeInternal<K, V>, K)
     {
         let mut right = NodeInternal::new_empty();
 
@@ -560,14 +557,14 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         (right, key)
     }
 
-    fn freeze_children(&mut self)
+    unsafe fn freeze_children(&mut self)
     {
         for i in range(0, self.used) {
             self.children[i].freeze();
         }
     }
 
-    fn len(&self) -> uint
+    unsafe fn len(&self) -> uint
     {
         let mut len = 0;
         for i in range(0, self.used) {
@@ -576,7 +573,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         len
     }
 
-    fn rotate_left(&mut self, left: &mut NodeInternal<K, V>) -> bool
+    unsafe fn rotate_left(&mut self, left: &mut NodeInternal<K, V>) -> bool
     {
         if left.used > INTERNAL_SIZE / 2 {
             self.keys[self.used-1] = self.children[self.used-1].max_key();
@@ -597,7 +594,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
-    fn rotate_right(&mut self, right: &mut NodeInternal<K, V>) -> bool
+    unsafe fn rotate_right(&mut self, right: &mut NodeInternal<K, V>) -> bool
     {
         if right.used > INTERNAL_SIZE / 2 {
             let key = right.children[right.used-1].max_key();
@@ -621,7 +618,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
-    fn merge(&mut self, right: &mut NodeInternal<K, V>)
+    unsafe fn merge(&mut self, right: &mut NodeInternal<K, V>)
     {
         self.keys[self.used-1] = self.children[self.used-1].max_key();
         for (src, dst) in range(self.used, self.used+right.used).enumerate() {
@@ -631,12 +628,12 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         self.used += right.used;
     }
 
-    fn max_key(&self) -> K
+    unsafe fn max_key(&self) -> K
     {
         self.children[self.used-1].max_key()
     }
 
-    fn iter<'a>(&'a self) -> NodeIterator<'a, K, V>
+    unsafe fn iter<'a>(&'a self) -> NodeIterator<'a, K, V>
     {
         NodeIterator {
             idx: 0,
@@ -645,11 +642,62 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
     }
 }
 
+impl<K, V> NodeInternal<K, V>
+{
+    #[inline(always)]
+    unsafe fn inc_ref(&self)
+    {
+        let mut_self = transmute_mut(self);
+        let old_count = (*mut_self).ref_count.fetch_add(1, Acquire);
+        assert!(old_count >= 1);
+    }
+
+    #[inline(always)]
+    unsafe fn dec_ref(&self) -> bool
+    {
+        let mut_self = transmute_mut(self);
+        let old_count = (*mut_self).ref_count.fetch_sub(1, SeqCst);
+        
+        if old_count == 1 {
+            for i in range(0, mut_self.used) {
+                let mut to_drop = Empty;
+                util::swap(&mut to_drop, &mut mut_self.children[i]);
+                to_drop.dec_ref();
+            }
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
+{
+    fn clone(&self) -> NodeInternal<K, V>
+    {
+        let mut new = NodeInternal::new_empty();
+
+        for i in range(0, self.used) {
+            new.children[i] = self.children[i].clone();
+        }
+
+        for i in range(0, self.used-1) {
+            new.keys[i] = self.keys[i].clone();
+        }
+
+        new.used = self.used;
+
+        new
+    }
+}
+
+
 impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
 {
     fn new() -> NodeLeaf<K, V>
     {
         NodeLeaf {
+            ref_count: AtomicUint::new(1),
             used: 0,
             keys: [default(), default(), default(), default(), default(), default(), default(), default(),
                    default(), default(), default(), default(), default(), default(), default(), default(),
@@ -865,30 +913,55 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
+impl<K, V> NodeLeaf<K, V>
 {
-    fn clone(&self) -> NodeInternal<K, V>
+    #[inline(always)]
+    unsafe fn inc_ref(&self)
     {
-        let mut new = NodeInternal::new_empty();
+        let mut_self = transmute_mut(self);
+        let old_count = (*mut_self).ref_count.fetch_add(1, Acquire);
+        assert!(old_count >= 1);
+    }
 
-        for i in range(0, self.used) {
-            new.children[i] = self.children[i].clone();
-        }
+    #[inline(always)]
+    unsafe fn dec_ref(&self) -> bool
+    {
+        let mut_self = transmute_mut(self);
+        let old_count = (*mut_self).ref_count.fetch_sub(1, SeqCst);
+        old_count == 1
+    }
+}
 
-        for i in range(0, self.used-1) {
-            new.keys[i] = self.keys[i].clone();
-        }
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
+{
+    fn clone(&self) -> NodeLeaf<K, V>
+    {
+        let mut new = NodeLeaf::new();
 
         new.used = self.used;
 
+        for i in range(0, self.used) {
+            new.values[i] = self.values[i].clone();
+            new.keys[i] = self.keys[i].clone();
+        }
+
         new
+    }
+}
+
+#[unsafe_destructor]
+impl<K, V> Drop for BTree<K, V>
+{
+    fn drop(&mut self)
+    {
+        unsafe {self.root.dec_ref()};
     }
 }
 
 impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Container for BTree<K, V> {
     fn len(&self) -> uint
     {
-        self.root.len()
+        unsafe{self.root.len()}
     }
 }
 
@@ -896,31 +969,28 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K,
     #[inline(always)]
     fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
-        let mut target = &self.root;
-        let mut target_leaf: Option<&~NodeLeaf<K, V>> = None;
+        unsafe {
+            let mut target = &self.root;
+            let mut target_leaf: Option<&NodeLeaf<K, V>> = None;
 
-        while target_leaf.is_none() {
-            match *target {
-                SharedInternal(ref node) => {
-                    let node = (*node).get();
-                    target = &node.children[node.search(key)];
-                },
-                Internal(ref node) => {
-                    target = &(*node).children[(*node).search(key)];
-                },
-                SharedLeaf(ref leaf) => {
-                    target_leaf = Some(leaf.get());
-                },
-                Leaf(ref leaf) => {
-                    target_leaf = Some(leaf);
-                },
-                Empty => {
-                    return None;
-                },
-            };
+            while target_leaf.is_none() {
+                match *target {
+                    Internal(ref node) => {
+                        let node: &NodeInternal<K, V> = transmute(*node);
+                        target = &node.children[node.search(key)];
+                    },
+                    Leaf(ref leaf) => {
+                        let leaf: &NodeLeaf<K, V> = transmute(*leaf);
+                        target_leaf = Some(leaf);
+                    },
+                    Empty => {
+                        return None;
+                    },
+                };
+            }
+
+            target_leaf.unwrap().find(key)
         }
-
-        target_leaf.unwrap().find(key)
     }
 }
 
@@ -949,11 +1019,13 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
 
     fn pop(&mut self, key: &K) -> Option<V>
     {
-        match self.root.pop(key) {
-            (_, found, false) => found,
-            (_, found, true) => {
-                self.root.lift();
-                found
+        unsafe {
+            match self.root.pop(key) {
+                (_, found, false) => found,
+                (_, found, true) => {
+                    self.root.lift();
+                    found
+                }
             }
         }
     }
@@ -961,40 +1033,46 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
     #[inline(always)]
     fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
     {
-        self.root.find_mut(key)
+        unsafe {
+            self.root.find_mut(key)
+        }
     }
 
     fn insert(&mut self, key: K, value: V) -> bool
     {
-        match self.root.insert(&key, &value) {
-            InsertDone(update) => update,
-            // if the left key is only updated
-            // on an insert, not an update so this
-            // can return false
-            InsertUpdateLeft(_) => false,
-            InsertUnfreeze => {
-                self.root.unfreeze();
-                self.insert(key, value)
-            }
-            Split => {
-                let (split_key, right) = match self.root {
-                    Leaf(ref mut leaf) => {
-                        let (right, key) = leaf.split();
-                        (key, Leaf(~right))
-                    },
-                    Internal(ref mut node) => {
-                        let (right, key) = node.split();
-                        (key, Internal(~right))
+        unsafe {
+            match self.root.insert(&key, &value) {
+                InsertDone(update) => update,
+                // if the left key is only updated
+                // on an insert, not an update so this
+                // can return false
+                InsertUpdateLeft(_) => false,
+                InsertUnfreeze => {
+                    self.root.unfreeze();
+                    self.insert(key, value)
+                }
+                Split => {
+                    let (split_key, right) = match self.root {
+                        Leaf(ref mut leaf) => {
+                            let leaf: &mut NodeLeaf<K, V> = transmute(*leaf);
+                            let (right, key) = leaf.split();
+                            (key, Leaf(transmute(~right)))
+                        },
+                        Internal(ref mut node) => {
+                            let node: &mut NodeInternal<K, V> = transmute(*node);
+                            let (right, key) = node.split();
+                            (key, Internal(transmute(~right)))
 
-                    }
-                    _ => fail!("this is impossible")
-                };
-                let mut left = Empty;
+                        }
+                        _ => fail!("this is impossible")
+                    };
+                    let mut left = Empty;
 
-                util::swap(&mut self.root, &mut left);
+                    util::swap(&mut self.root, &mut left);
 
-                self.root = Internal(~NodeInternal::new(split_key, left, right));
-                self.insert(key, value)
+                    self.root = Internal(transmute(~NodeInternal::new(split_key, left, right)));
+                    self.insert(key, value)
+                }
             }
         }
     }
@@ -1004,9 +1082,12 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
 {
     fn clone(&self) -> BTree<K, V>
     {
-        BTree {
-            root: self.root.clone()
-        }    
+        unsafe {
+            self.root.inc_ref();
+            BTree {
+                root: self.root
+            }
+        }
     }
 }
 
@@ -1021,21 +1102,29 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<
 
     pub fn freeze(&mut self)
     {
-        self.root.freeze()
+        unsafe {
+            self.root.freeze()
+        }
     }
 
     pub fn iter<'a>(&'a self) -> BTreeIterator<'a, K, V>
     {
-        let (leaf, stack) = match self.root {
-            Leaf(ref l)           => (Some(l.iter()), ~[]),
-            SharedLeaf(ref l)     => (Some(l.get().iter()), ~[]),
-            Internal(ref n)       => (None, ~[n.iter()]),
-            SharedInternal(ref n) => (None, ~[n.get().iter()]),
-            Empty                 => (None, ~[])
-        };
-        BTreeIterator {
-            leaf: leaf,
-            stack: stack
+        unsafe {
+            let (leaf, stack) = match self.root {
+                Leaf(ref leaf) => {
+                    let leaf: &NodeLeaf<K, V> = transmute(*leaf);
+                    (Some(leaf.iter()), ~[])
+                }
+                Internal(ref node) => {
+                    let node: &NodeInternal<K, V> = transmute(*node);
+                    (None, ~[node.iter()])
+                },
+                Empty => (None, ~[])
+            };
+            BTreeIterator {
+                leaf: leaf,
+                stack: stack
+            }
         }
     }
 }
@@ -1050,18 +1139,24 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
 {
     fn next(&mut self) -> Option<NodeIteratorRes<'a,K,V>>
     {
-        if self.idx < self.node.used {
-            let idx = self.idx;
-            self.idx += 1;
-            match self.node.children[idx] {
-                Leaf(ref l)           => Some(LeafIter(l.iter())),
-                SharedLeaf(ref l)     => Some(LeafIter(l.get().iter())),
-                Internal(ref n)       => Some(InternalIter(n.iter())),
-                SharedInternal(ref n) => Some(InternalIter(n.get().iter())),
-                Empty                 => None             
+        unsafe {
+            if self.idx < self.node.used {
+                let idx = self.idx;
+                self.idx += 1;
+                match self.node.children[idx] {
+                    Leaf(ref leaf) => {
+                        let leaf: &NodeLeaf<K, V> = transmute(*leaf);
+                        Some(LeafIter(leaf.iter()))
+                    },
+                    Internal(ref node) => {
+                        let node: &NodeInternal<K, V> = transmute(*node);
+                        Some(InternalIter(node.iter()))
+                    }
+                    Empty => None             
+                }
+            } else {
+                None
             }
-        } else {
-            None
         }
     }
 }

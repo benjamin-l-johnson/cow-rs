@@ -124,28 +124,6 @@ fn btree_iter(_: uint, tup: &(~[uint], BTree<uint, uint>))
 }
 
 #[inline(always)]
-fn btree_freeze_build(build_arr: ~[uint]) -> (~[uint], BTree<uint, uint>)
-{
-    let mut btree = BTree::new();
-    for &node in build_arr.iter() {
-        btree.insert(node, node);
-    }
-    btree.freeze();
-    (build_arr, btree)
-}
-
-
-#[inline(always)]
-fn btree_freeze_insert(_: uint, data: &~[uint])
-{
-    let mut btree = BTree::new();
-    for &node in data.iter() {
-        btree.insert(node, node);
-    }
-    btree.freeze();
-}
-
-#[inline(always)]
 fn hmap_build(build_arr: ~[uint]) -> (~[uint], HashMap<uint, uint>)
 {
     let mut hmap = HashMap::new();
@@ -346,7 +324,6 @@ fn main()
 {
     let mut  table = ~[];
     table.push(bench(~"Btree", btree_build, btree_insert, btree_find, btree_clone, btree_iter));
-    table.push(bench(~"Btree frozen", btree_freeze_build, btree_freeze_insert, btree_find, btree_clone, btree_iter));
     table.push(bench(~"HashMap", hmap_build, hmap_insert, hmap_find, hmap_clone, hmap_iter));
     table.push(bench(~"TreeMap", tmap_build, tmap_insert, tmap_find, tmap_clone, tmap_iter));
 
