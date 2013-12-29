@@ -377,47 +377,7 @@ fn iter_test_10_000() { iter_test_n(10_000) }
 fn iter_test_40_000() { iter_test_n(40_000) }
 
 #[test]
-fn freeze()
-{
-    let mut btree: BTree<uint, uint> = BTree::new();
-
-    for i in range(0, 1100u) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 1100u) {
-        check(&btree, i, i);
-    }
-
-    for i in range(0, 1100u) {
-        check(&btree, i, i);
-    }    
-}
-
-#[test]
-fn freeze_set()
-{
-    let mut btree: BTree<uint, uint> = BTree::new();
-
-    for i in range(0, 1100u) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 1100u) {
-        check(&btree, i, i);
-    }
-
-    for i in range(1100u, 2200u) {
-        btree.insert(i, i);
-    }
-
-    for i in range(0, 2200u) {
-        check(&btree, i, i);
-    } 
-}
-
-#[test]
-fn freeze_set2()
+fn cow_clone()
 {
     let mut btree: BTree<uint, uint> = BTree::new();
 
@@ -450,3 +410,282 @@ fn freeze_set2()
         assert!(old.find(&i).is_none());
     } 
 }
+
+fn cow_tasks_append_n(count: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    for i in range(0, count) {
+        btree.insert(i, i);
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    }
+
+    for offset in range(1u, 65u) {
+        let new = btree.clone();
+        do spawn {
+            let mut new = new;
+            for i in range(count, count*2) {
+                new.insert(i, i+offset);
+            }
+            for i in range(0, count) {
+                check(&new, i, i);
+            }
+            for i in range(count, count*2) {
+                check(&new, i, i+offset);
+            }
+        }
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    }
+
+    for i in range(count, count*2) {
+        assert!(btree.find(&i).is_none());
+    } 
+}
+
+fn cow_tasks_update_n(count: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    for i in range(0, count) {
+        btree.insert(i, i);
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    }
+
+    for offset in range(1u, 65u) {
+        let new = btree.clone();
+        do spawn {
+            let mut new = new;
+            for i in range(0, count) {
+                new.insert(i, i+offset);
+            }
+            for i in range(0, count) {
+                check(&new, i, i+offset);
+            }
+        }
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    } 
+}
+
+fn cow_tasks_remove_n(count: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    for i in range(0, count) {
+        btree.insert(i, i);
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    }
+
+    for _ in range(1u, 65u) {
+        let new = btree.clone();
+        do spawn {
+            let mut new = new;
+            for i in range(0, count) {
+                new.remove(&i);
+            }
+
+            for i in range(0, count) {
+                assert!(new.find(&i).is_none());
+            } 
+        }
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    } 
+}
+
+fn cow_tasks_swap_n(count: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    for i in range(0, count) {
+        btree.insert(i, i);
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    }
+
+    for offset in range(1u, 65u) {
+        let new = btree.clone();
+        do spawn {
+            let mut new = new;
+            for i in range(0, count) {
+                assert!(new.swap(i, i+offset).is_some());
+            }
+            for i in range(0, count) {
+                check(&new, i, i+offset);
+            }
+        }
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    } 
+}
+
+fn cow_tasks_pop_n(count: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    for i in range(0, count) {
+        btree.insert(i, i);
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    }
+
+    for _ in range(1u, 65u) {
+        let new = btree.clone();
+        do spawn {
+            let mut new = new;
+            for i in range(0, count) {
+                assert!(new.pop(&i).is_some());
+            }
+            for i in range(0, count) {
+                assert!(new.pop(&i).is_none());
+            }
+        }
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    } 
+}
+
+fn cow_tasks_find_mut_n(count: uint)
+{
+    let mut btree: BTree<uint, uint> = BTree::new();
+
+    for i in range(0, count) {
+        btree.insert(i, i);
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    }
+
+    for offset in range(1u, 65u) {
+        let new = btree.clone();
+        do spawn {
+            let mut new = new;
+            for i in range(0, count) {
+                let val = new.find_mut(&i).unwrap();
+                *val = i + offset;
+            }
+            for i in range(0, count) {
+                check(&new, i, i+offset);
+            }
+        }
+    }
+
+    for i in range(0, count) {
+        check(&btree, i, i);
+    } 
+}
+
+#[test]
+fn cow_tasks_append_10() { cow_tasks_append_n(10) }
+#[test]
+fn cow_tasks_append_80() { cow_tasks_append_n(80) }
+#[test]
+fn cow_tasks_append_120() { cow_tasks_append_n(120) }
+#[test]
+fn cow_tasks_append_990() { cow_tasks_append_n(990) }
+#[test]
+fn cow_tasks_append_2_500() { cow_tasks_append_n(2_500) }
+#[test]
+fn cow_tasks_append_10_000() { cow_tasks_append_n(10_000) }
+#[test]
+fn cow_tasks_append_40_000() { cow_tasks_append_n(40_000) }
+
+#[test]
+fn cow_tasks_update_10() { cow_tasks_update_n(10) }
+#[test]
+fn cow_tasks_update_80() { cow_tasks_update_n(80) }
+#[test]
+fn cow_tasks_update_120() { cow_tasks_update_n(120) }
+#[test]
+fn cow_tasks_update_990() { cow_tasks_update_n(990) }
+#[test]
+fn cow_tasks_update_2_500() { cow_tasks_update_n(2_500) }
+#[test]
+fn cow_tasks_update_10_000() { cow_tasks_update_n(10_000) }
+#[test]
+fn cow_tasks_update_40_000() { cow_tasks_update_n(40_000) }
+
+#[test]
+fn cow_tasks_remove_10() { cow_tasks_remove_n(10) }
+#[test]
+fn cow_tasks_remove_80() { cow_tasks_remove_n(80) }
+#[test]
+fn cow_tasks_remove_120() { cow_tasks_remove_n(120) }
+#[test]
+fn cow_tasks_remove_990() { cow_tasks_remove_n(990) }
+#[test]
+fn cow_tasks_remove_2_500() { cow_tasks_remove_n(2_500) }
+#[test]
+fn cow_tasks_remove_10_000() { cow_tasks_remove_n(10_000) }
+#[test]
+fn cow_tasks_remove_40_000() { cow_tasks_remove_n(40_000) }
+
+#[test]
+fn cow_tasks_swap_10() { cow_tasks_swap_n(10) }
+#[test]
+fn cow_tasks_swap_80() { cow_tasks_swap_n(80) }
+#[test]
+fn cow_tasks_swap_120() { cow_tasks_swap_n(120) }
+#[test]
+fn cow_tasks_swap_990() { cow_tasks_swap_n(990) }
+#[test]
+fn cow_tasks_swap_2_500() { cow_tasks_swap_n(2_500) }
+#[test]
+fn cow_tasks_swap_10_000() { cow_tasks_swap_n(10_000) }
+#[test]
+fn cow_tasks_swap_40_000() { cow_tasks_swap_n(40_000) }
+
+#[test]
+fn cow_tasks_pop_10() { cow_tasks_pop_n(10) }
+#[test]
+fn cow_tasks_pop_80() { cow_tasks_pop_n(80) }
+#[test]
+fn cow_tasks_pop_120() { cow_tasks_pop_n(120) }
+#[test]
+fn cow_tasks_pop_990() { cow_tasks_pop_n(990) }
+#[test]
+fn cow_tasks_pop_2_500() { cow_tasks_pop_n(2_500) }
+#[test]
+fn cow_tasks_pop_10_000() { cow_tasks_pop_n(10_000) }
+#[test]
+fn cow_tasks_pop_40_000() { cow_tasks_pop_n(40_000) }
+
+#[test]
+fn cow_tasks_find_mut_10() { cow_tasks_find_mut_n(10) }
+#[test]
+fn cow_tasks_find_mut_80() { cow_tasks_find_mut_n(80) }
+#[test]
+fn cow_tasks_find_mut_120() { cow_tasks_find_mut_n(120) }
+#[test]
+fn cow_tasks_find_mut_990() { cow_tasks_find_mut_n(990) }
+#[test]
+fn cow_tasks_find_mut_2_500() { cow_tasks_find_mut_n(2_500) }
+#[test]
+fn cow_tasks_find_mut_10_000() { cow_tasks_find_mut_n(10_000) }
+#[test]
+fn cow_tasks_find_mut_40_000() { cow_tasks_find_mut_n(40_000) }
