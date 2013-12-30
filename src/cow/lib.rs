@@ -13,6 +13,7 @@ struct CowCell<T> {
     priv data: T
 }
 
+#[unsafe_no_drop_flag]
 pub struct Cow<T> {
     priv ptr: *mut CowCell<T>
 }
@@ -119,9 +120,14 @@ impl<T> Drop for Cow<T>
     fn drop(&mut self)
     {
         unsafe {
+            if self.ptr.is_null() {
+                return;
+            }
+
             // dec ref, if last ref free data
             if self.dec_ref() {
                 let _: ~CowCell<T> = transmute(self.ptr);
+                self.ptr = std::ptr::mut_null();
             }
         }
     }

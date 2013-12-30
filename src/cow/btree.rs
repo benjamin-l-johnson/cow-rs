@@ -639,13 +639,13 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeLeaf<K, V>
 
         self.used -= 1;
 
-        (   if self.used != 0 {
-                Some(self.keys[self.used-1].clone())
-            } else {
-                None
-            },
-            Some(value),
-            self.used < LEAF_SIZE / 2)
+        (if self.used != 0 {
+             Some(self.keys[self.used-1].clone())
+         } else {
+             None
+         },
+         Some(value),
+         self.used < LEAF_SIZE / 2)
     }
 
     #[inline(always)]
@@ -898,11 +898,11 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> BTree<K, V>
 {
     pub fn new() -> BTree<K, V>
     {
-        /*println!("{:?} {:?} {:?}",
-                std::mem::size_of::<Node<K, V>>(),
-                std::mem::size_of::<NodeLeaf<K, V>>(),
-                std::mem::size_of::<NodeInternal<K, V>>()
-        );*/
+        //println!("{:?} {:?} {:?}",
+        //        std::mem::size_of::<Node<K, V>>(),
+        //        std::mem::size_of::<NodeLeaf<K, V>>(),
+        //        std::mem::size_of::<NodeInternal<K, V>>()
+        //);
         BTree {
             root: Empty
         }
