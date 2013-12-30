@@ -1,9 +1,9 @@
 #[feature(macro_rules)];
 
-extern mod btree;
+extern mod cow;
 extern mod extra;
 
-use btree::BTree;
+use cow::BTree;
 use extra::time::precise_time_s;
 use std::rand::{Rng, IsaacRng, SeedableRng};
 use std::hashmap::HashMap;

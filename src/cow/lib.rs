@@ -1,5 +1,7 @@
-
-#[pkgid = "github.com/csherratt/arc-btree-rs#btree:0.1"];
+#[crate_id = "github.com/csherratt/cow-rs#cow:0.1"];
+#[comment = "An OpenGL function loader."];
+#[license = "ASL2"];
+#[crate_type = "lib"];
 
 extern mod extra;
 

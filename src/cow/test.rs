@@ -1,6 +1,6 @@
-extern mod btree;
+extern mod cow;
 
-use btree::{BTree};
+use cow::{BTree};
 use std::rand::{Rng, IsaacRng, SeedableRng};
 
 static NUM_TASKS: uint = 8;
