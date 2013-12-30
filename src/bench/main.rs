@@ -3,7 +3,7 @@
 extern mod cow;
 extern mod extra;
 
-use cow::BTree;
+use cow::btree::BTree;
 use extra::time::precise_time_s;
 use std::rand::{Rng, IsaacRng, SeedableRng};
 use std::hashmap::HashMap;
