@@ -3,6 +3,8 @@ extern mod btree;
 use btree::{BTree};
 use std::rand::{Rng, IsaacRng, SeedableRng};
 
+static NUM_TASKS: uint = 8;
+
 fn check(btree: &BTree<uint, uint>, key: uint, expected: uint)
 {
     match btree.find(&key) {
@@ -423,7 +425,7 @@ fn cow_tasks_append_n(count: uint)
         check(&btree, i, i);
     }
 
-    for offset in range(1u, 65u) {
+    for offset in range(1u, NUM_TASKS+1) {
         let new = btree.clone();
         do spawn {
             let mut new = new;
@@ -460,7 +462,7 @@ fn cow_tasks_update_n(count: uint)
         check(&btree, i, i);
     }
 
-    for offset in range(1u, 65u) {
+    for offset in range(1u, NUM_TASKS+1) {
         let new = btree.clone();
         do spawn {
             let mut new = new;
@@ -490,7 +492,7 @@ fn cow_tasks_remove_n(count: uint)
         check(&btree, i, i);
     }
 
-    for _ in range(1u, 65u) {
+    for _ in range(1u, NUM_TASKS+1) {
         let new = btree.clone();
         do spawn {
             let mut new = new;
@@ -521,7 +523,7 @@ fn cow_tasks_swap_n(count: uint)
         check(&btree, i, i);
     }
 
-    for offset in range(1u, 65u) {
+    for offset in range(1u, NUM_TASKS+1) {
         let new = btree.clone();
         do spawn {
             let mut new = new;
@@ -551,7 +553,7 @@ fn cow_tasks_pop_n(count: uint)
         check(&btree, i, i);
     }
 
-    for _ in range(1u, 65u) {
+    for _ in range(1u, NUM_TASKS+1) {
         let new = btree.clone();
         do spawn {
             let mut new = new;
@@ -581,7 +583,7 @@ fn cow_tasks_find_mut_n(count: uint)
         check(&btree, i, i);
     }
 
-    for offset in range(1u, 65u) {
+    for offset in range(1u, NUM_TASKS+1) {
         let new = btree.clone();
         do spawn {
             let mut new = new;

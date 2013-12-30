@@ -3,14 +3,13 @@
 
 extern mod extra;
 
-use std::kinds::{Freeze, Send};
-use std::default::{Default};
+use std::default::Default;
 use std::util;
 use std::sync::atomics::{AtomicUint, SeqCst, Acquire};
 use std::cast::{transmute, transmute_mut};
 
-static LEAF_SIZE: uint = 63;
-static INTERNAL_SIZE: uint = 128;
+static LEAF_SIZE: uint = 31;
+static INTERNAL_SIZE: uint = 42;
 
 struct NodeLeaf<K, V> {
     ref_count: AtomicUint,
@@ -47,7 +46,7 @@ fn default<T: Default>() -> T
     Default::default()
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for Node<K, V>
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> Clone for Node<K, V>
 {
     fn clone(&self) -> Node<K, V>
     {
@@ -69,8 +68,9 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> Node<K, V>
 {
+    #[inline(always)]
     unsafe fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         self.mutable();
@@ -350,47 +350,16 @@ impl<K, V> Node<K, V>
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInternal<K, V>
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
 {
     fn new(key: K, left: Node<K, V>, right: Node<K, V>) -> NodeInternal<K, V>
     {
-        NodeInternal {
-            ref_count: AtomicUint::new(1),
-            used: 2,
-            keys: [key,       default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default()]
-            ,
-            children: [left,  right, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty]
-        }
+        let mut node = NodeInternal::new_empty();
+        node.used = 2;
+        node.keys[0] = key;
+        node.children[0] = left;
+        node.children[1] = right;
+        node
     }
 
     fn new_empty() -> NodeInternal<K, V>
@@ -398,41 +367,32 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         NodeInternal {
             ref_count: AtomicUint::new(1),
             used: 0,
-            keys: [default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default()],
-            children: [Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-                       Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty]
+            keys: [default(), default(), default(), default(),  // 0-3
+                   default(), default(), default(), default(),  // 4-7
+                   default(), default(), default(), default(),  // 8-11
+                   default(), default(), default(), default(),  // 12-15
+                   default(), default(), default(), default(),  // 16-19
+                   default(), default(), default(), default(),  // 20-23
+                   default(), default(), default(), default(),  // 24-27
+                   default(), default(), default(), default(),  // 28-31
+                   default(), default(), default(), default(),  // 32-35
+                   default(), default(), default(), default(),  // 36-39
+                   default()],                                  // 40
+            children: [Empty, Empty, Empty, Empty,  // 0-3
+                       Empty, Empty, Empty, Empty,  // 4-7
+                       Empty, Empty, Empty, Empty,  // 8-11
+                       Empty, Empty, Empty, Empty,  // 12-15
+                       Empty, Empty, Empty, Empty,  // 16-19
+                       Empty, Empty, Empty, Empty,  // 20-23
+                       Empty, Empty, Empty, Empty,  // 24-27
+                       Empty, Empty, Empty, Empty,  // 28-31
+                       Empty, Empty, Empty, Empty,  // 32-35
+                       Empty, Empty, Empty, Empty,  // 36-39
+                       Empty, Empty],               // 40-41
         }
     }
 
+    #[inline(always)]
     unsafe fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         let idx = self.search(key);
@@ -473,6 +433,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
+    #[inline(always)]
     unsafe fn redist(&mut self, idx: uint)
     {
         if idx + 1 != self.used {
@@ -549,18 +510,26 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
     }
 
     #[inline(always)]
-    unsafe fn search(&self, key: &K) -> uint
+    fn search(&self, key: &K) -> uint
     {
-        let mut start = 0u;
         let mut end = self.used-1;
+        let mut start = 0u;
+        for i in std::iter::range_step(2u, end, 8u) {
+            match key.cmp(&self.keys[i]) {
+                Less | Equal => {
+                    end = i;
+                    break;
+                },
+                Greater => {
+                    start = i;
+                }
+            }
+        }
 
         while end > start {
-            let mid = start + ((end-start) / 2);
-
-            match key.cmp(&self.keys[mid]) {
-                Less => end = mid,
-                Equal => return mid,
-                Greater => start = mid+1,
+            match key.cmp(&self.keys[start]) {
+                Equal | Less => return start,
+                Greater => start += 1,
             }
         }
         if start != self.used-1 {
@@ -573,6 +542,33 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
+// this is about 15% slower then search
+//    #[inline(always)]
+//    unsafe fn bsearch(&self, key: &K) -> uint
+//    {
+//        let mut start = 0u;
+//        let mut end = self.used-1;
+//
+//        while end > start {
+//            let mid = start + ((end-start) / 2);
+//
+//            match key.cmp(&self.keys[mid]) {
+//                Less => end = mid,
+//                Equal => return mid,
+//                Greater => start = mid+1,
+//            }
+//        }
+//        if start != self.used-1 {
+//            match key.cmp(&self.keys[start]) {
+//                Less | Equal => start,
+//                Greater => start+1,
+//            }
+//        } else {
+//            start
+//        }
+//    }
+
+    #[inline(always)]
     unsafe fn split(&mut self) -> (NodeInternal<K, V>, K)
     {
         let mut right = NodeInternal::new_empty();
@@ -603,6 +599,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         len
     }
 
+    #[inline(always)]
     unsafe fn rotate_left(&mut self, left: &mut NodeInternal<K, V>) -> bool
     {
         if left.used > INTERNAL_SIZE / 2 {
@@ -624,6 +621,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
+    #[inline(always)]
     unsafe fn rotate_right(&mut self, right: &mut NodeInternal<K, V>) -> bool
     {
         if right.used > INTERNAL_SIZE / 2 {
@@ -648,6 +646,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         }
     }
 
+    #[inline(always)]
     unsafe fn merge(&mut self, right: &mut NodeInternal<K, V>)
     {
         self.keys[self.used-1] = self.children[self.used-1].max_key();
@@ -707,7 +706,7 @@ impl<K, V> NodeInternal<K, V>
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> Clone for NodeInternal<K, V>
 {
     fn clone(&self) -> NodeInternal<K, V>
     {
@@ -728,29 +727,29 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
 }
 
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeLeaf<K, V>
 {
     fn new() -> NodeLeaf<K, V>
     {
         NodeLeaf {
             ref_count: AtomicUint::new(1),
             used: 0,
-            keys: [default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default(), default(),
-                   default(), default(), default(), default(), default(), default(), default()],
-            values: [default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default(), default(),
-                     default(), default(), default(), default(), default(), default(), default()]
+            keys: [default(), default(), default(), default(),  // 0-3
+                   default(), default(), default(), default(),  // 4-7
+                   default(), default(), default(), default(),  // 8-11
+                   default(), default(), default(), default(),  // 12-15
+                   default(), default(), default(), default(),  // 16-19
+                   default(), default(), default(), default(),  // 20-23
+                   default(), default(), default(), default(),  // 24-27
+                   default(), default(), default()],            // 28-30
+            values: [default(), default(), default(), default(),  // 0-3
+                     default(), default(), default(), default(),  // 4-7
+                     default(), default(), default(), default(),  // 8-11
+                     default(), default(), default(), default(),  // 12-15
+                     default(), default(), default(), default(),  // 16-19
+                     default(), default(), default(), default(),  // 20-23
+                     default(), default(), default(), default(),  // 24-27
+                     default(), default(), default()]             // 28-30
         }
     }
 
@@ -782,7 +781,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         }
     }
 
-
+    #[inline(always)]
     fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
     {
         if self.used == LEAF_SIZE {
@@ -815,6 +814,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         }
     }
 
+    #[inline(always)]
     fn pop(&mut self, key: &K) -> (Option<K>, Option<V>, bool)
     {
         let idx = match self.search(key) {
@@ -843,8 +843,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
             self.used < LEAF_SIZE / 2)
     }
 
-
-
+    #[inline(always)]
     fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
         match self.search(key) {
@@ -853,6 +852,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         }
     }
 
+    #[inline(always)]
     fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V>
     {
         match self.search(key) {
@@ -861,6 +861,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         }
     }
 
+    #[inline(always)]
     fn split(&mut self) -> (NodeLeaf<K, V>, K)
     {
         let mut right = NodeLeaf::new();
@@ -876,11 +877,13 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         (right, self.keys[self.used-1].clone())
     }
 
+    #[inline(always)]
     fn len(&self) -> uint
     {
         return self.used;
     }
 
+    #[inline(always)]
     fn rotate_left(&mut self, left: &mut NodeLeaf<K, V>) -> bool
     {
         if left.used > LEAF_SIZE / 2 {
@@ -902,6 +905,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         }
     }
 
+    #[inline(always)]
     fn rotate_right(&mut self, right: &mut NodeLeaf<K, V>) -> bool
     {
         if right.used > LEAF_SIZE / 2 {
@@ -925,6 +929,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         }
     }
 
+    #[inline(always)]
     fn merge(&mut self, right: &mut NodeLeaf<K, V>)
     {
         for (src, dst) in range(self.used, self.used+right.used).enumerate() {
@@ -934,12 +939,13 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         self.used += right.used;
     }
 
+    #[inline(always)]
     fn max_key(&self) -> K
     {
         self.keys[self.used-1].clone()
     }
 
-
+    #[inline(always)]
     fn iter<'a>(&'a self) -> LeafIterator<'a, K, V>
     {
         LeafIterator {
@@ -974,7 +980,7 @@ impl<K, V> NodeLeaf<K, V>
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> Clone for NodeLeaf<K, V>
 {
     fn clone(&self) -> NodeLeaf<K, V>
     {
@@ -1000,14 +1006,14 @@ impl<K, V> Drop for BTree<K, V>
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Container for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> Container for BTree<K, V> {
     fn len(&self) -> uint
     {
         unsafe{self.root.len()}
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V> for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> Map<K, V> for BTree<K, V> {
     #[inline(always)]
     fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
@@ -1036,14 +1042,15 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K,
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> Mutable for BTree<K, V> {
     fn clear(&mut self)
     {
         self.root = Empty;
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> MutableMap<K, V> for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> MutableMap<K, V> for BTree<K, V> {
+    #[inline(always)]
     fn swap(&mut self, key: K, value: V) -> Option<V>
     {
         match self.find_mut(&key) {
@@ -1059,6 +1066,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
         None
     }
 
+    #[inline(always)]
     fn pop(&mut self, key: &K) -> Option<V>
     {
         unsafe {
@@ -1080,6 +1088,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
         }
     }
 
+    #[inline(always)]
     fn insert(&mut self, key: K, value: V) -> bool
     {
         unsafe {
@@ -1116,7 +1125,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> Clone for BTree<K, V>
 {
     fn clone(&self) -> BTree<K, V>
     {
@@ -1129,10 +1138,15 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
+impl<K: Default+Clone+TotalOrd, V: Default+Clone> BTree<K, V>
 {
     pub fn new() -> BTree<K, V>
     {
+        /*println!("{:?} {:?} {:?}",
+                std::mem::size_of::<Node<K, V>>(),
+                std::mem::size_of::<NodeLeaf<K, V>>(),
+                std::mem::size_of::<NodeInternal<K, V>>()
+        );*/
         BTree {
             root: Empty
         }
@@ -1166,7 +1180,7 @@ struct NodeIterator<'a, K, V>
     node: &'a NodeInternal<K, V>
 }
 
-impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<NodeIteratorRes<'a,K,V>> for NodeIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd, V: Default+Clone> Iterator<NodeIteratorRes<'a,K,V>> for NodeIterator<'a, K, V>
 {
     fn next(&mut self) -> Option<NodeIteratorRes<'a,K,V>>
     {
@@ -1198,7 +1212,7 @@ struct LeafIterator<'a, K, V>
     leaf: &'a NodeLeaf<K, V>
 }
 
-impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for LeafIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd, V: Default+Clone> Iterator<(&'a K, &'a V)> for LeafIterator<'a, K, V>
 {
     fn next(&mut self) -> Option<(&'a K, &'a V)>
     {
@@ -1224,7 +1238,7 @@ enum NodeIteratorRes<'a, K, V>
     LeafIter(LeafIterator<'a, K, V>)
 }
 
-impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for BTreeIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd, V: Default+Clone> Iterator<(&'a K, &'a V)> for BTreeIterator<'a, K, V>
 {
     #[inline(always)]
     fn next(&mut self) -> Option<(&'a K, &'a V)>
