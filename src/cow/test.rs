@@ -1,26 +1,26 @@
 extern mod cow;
 
 mod cowcell {
-    use cow::Cow;
+    use cow::CowArc;
 
     #[test]
     fn get()
     {
-        let cow = Cow::new(75u);
+        let cow = CowArc::new(75u);
         assert!(75 == *cow.get());
     }
 
     #[test]
     fn get_mut()
     {
-        let mut cow = Cow::new(75u);
+        let mut cow = CowArc::new(75u);
         assert!(75 == *cow.get_mut());
     }
 
     #[test]
     fn clone()
     {
-        let cow0 = Cow::new(75u);
+        let cow0 = CowArc::new(75u);
         let cow1 = cow0.clone();
         let cow2 = cow1.clone();
 
@@ -35,7 +35,7 @@ mod cowcell {
     #[test]
     fn clone_get_mut()
     {
-        let mut cow0 = Cow::new(75u);
+        let mut cow0 = CowArc::new(75u);
         let mut cow1 = cow0.clone();
         let mut cow2 = cow1.clone();
 
@@ -59,7 +59,7 @@ mod cowcell {
     #[test]
     fn clone_get_mut2()
     {
-        let mut cow0 = Cow::new(75u);
+        let mut cow0 = CowArc::new(75u);
         let cow1 = cow0.clone();
         let cow2 = cow1.clone();
 
