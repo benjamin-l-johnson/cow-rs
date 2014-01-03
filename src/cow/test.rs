@@ -120,8 +120,8 @@ mod btree {
 
         for i in range(0, len) {
             btree.insert(i, i);
+            assert!(i+1 == btree.len())
         }
-
 
         for i in range(0, len) {
             check(&btree, i, i);
@@ -135,14 +135,9 @@ mod btree {
 
         let build_arr = shuffled(len as uint);
 
-
-        for &b in build_arr.iter() {
+        for (idx, &b) in build_arr.iter().enumerate() {
             btree.insert(b, b);
-
-        }
-
-        for &b in build_arr.iter() {
-            btree.insert(b, b);
+            assert!(idx+1 == btree.len())
         }
 
         for i in range(0, len) {
@@ -157,8 +152,9 @@ mod btree {
 
         let build_arr = shuffled(len as uint);
 
-        for &b in build_arr.iter() {
+        for (idx, &b) in build_arr.iter().enumerate() {
             assert!(btree.insert(b, b) == false);
+            assert!(idx+1 == btree.len());
         }
 
         for i in range(0, len) {
@@ -181,21 +177,20 @@ mod btree {
 
         let build_arr = shuffled(len as uint);
 
-        for &i in build_arr.iter() {
+        for (cnt, &i) in build_arr.iter().enumerate() {
             btree.insert(i, i);
+            assert!(cnt+1 == btree.len());
         }
 
         for &i in build_arr.iter() {
             check(&btree, i, i);
         }
 
-        for &i in build_arr.iter() {
-            if !btree.find(&i).is_some() {
-                println!("{:?}, {:?}", i, btree);
-            }
+        for (cnt, &i) in build_arr.iter().enumerate() {
             assert!(btree.remove(&i) == true);
             assert!(btree.find(&i).is_none());
             assert!(btree.remove(&i) == false);
+            assert!(len-cnt-1 == btree.len());
         }
         assert!(0 == btree.len())
     }
@@ -335,7 +330,7 @@ mod btree {
     #[test]
     fn insert_and_fetch_10_000() { insert_and_fetch_n(10_000) }
     #[test]
-    fn insert_and_fetch_40_000() { insert_and_fetch_n(40_000) }
+    fn insert_and_fetch_100_000() { insert_and_fetch_n(100_000) }
 
     #[test]
     fn insert_and_fetch_shuffle_10() { insert_and_fetch_shuffle_n(10) }
@@ -350,7 +345,7 @@ mod btree {
     #[test]
     fn insert_and_fetch_shuffle_10_000() { insert_and_fetch_shuffle_n(10_000) }
     #[test]
-    fn insert_and_fetch_shuffle_40_000() { insert_and_fetch_shuffle_n(40_000) }
+    fn insert_and_fetch_shuffle_100_000() { insert_and_fetch_shuffle_n(100_000) }
 
     #[test]
     fn update_and_fetch_10() { update_shuffle_n(10) }
@@ -365,7 +360,7 @@ mod btree {
     #[test]
     fn update_and_fetch_10_000() { update_shuffle_n(10_000) }
     #[test]
-    fn update_and_fetch_40_000() { update_shuffle_n(40_000) }
+    fn update_and_fetch_100_000() { update_shuffle_n(100_000) }
 
     #[test]
     fn remove_10() { remove_n(10) }
@@ -380,7 +375,7 @@ mod btree {
     #[test]
     fn remove_10_000() { remove_n(10_000) }
     #[test]
-    fn remove_40_000() { remove_n(40_000) }
+    fn remove_100_000() { remove_n(100_000) }
 
     #[test]
     fn pop_10() { pop_n(10) }
@@ -395,7 +390,7 @@ mod btree {
     #[test]
     fn pop_10_000() { pop_n(10_000) }
     #[test]
-    fn pop_40_000() { pop_n(40_000) }
+    fn pop_100_000() { pop_n(100_000) }
 
     #[test]
     fn find_mut_10() { find_mut_n(10) }
@@ -410,7 +405,7 @@ mod btree {
     #[test]
     fn find_mut_10_000() { find_mut_n(10_000) }
     #[test]
-    fn find_mut_40_000() { find_mut_n(40_000) }
+    fn find_mut_100_000() { find_mut_n(100_000) }
 
     #[test]
     fn swap_10() { swap_n(10) }
@@ -425,7 +420,7 @@ mod btree {
     #[test]
     fn swap_10_000() { swap_n(10_000) }
     #[test]
-    fn swap_40_000() { swap_n(40_000) }
+    fn swap_100_000() { swap_n(100_000) }
 
     #[test]
     fn insert_remove_shuffle_10() { insert_remove_shuffle_n(10) }
@@ -440,7 +435,7 @@ mod btree {
     #[test]
     fn insert_remove_shuffle_10_000() { insert_remove_shuffle_n(10_000) }
     #[test]
-    fn insert_remove_shuffle_40_000() { insert_remove_shuffle_n(40_000) }
+    fn insert_remove_shuffle_100_000() { insert_remove_shuffle_n(100_000) }
 
     #[test]
     fn iter_test_10() { iter_test_n(10) }
@@ -455,7 +450,7 @@ mod btree {
     #[test]
     fn iter_test_10_000() { iter_test_n(10_000) }
     #[test]
-    fn iter_test_40_000() { iter_test_n(40_000) }
+    fn iter_test_100_000() { iter_test_n(100_000) }
 
     #[test]
     fn cow_clone()
@@ -694,7 +689,7 @@ mod btree {
     #[test]
     fn cow_tasks_append_10_000() { cow_tasks_append_n(10_000) }
     #[test]
-    fn cow_tasks_append_40_000() { cow_tasks_append_n(40_000) }
+    fn cow_tasks_append_100_000() { cow_tasks_append_n(100_000) }
 
     #[test]
     fn cow_tasks_update_10() { cow_tasks_update_n(10) }
@@ -709,7 +704,7 @@ mod btree {
     #[test]
     fn cow_tasks_update_10_000() { cow_tasks_update_n(10_000) }
     #[test]
-    fn cow_tasks_update_40_000() { cow_tasks_update_n(40_000) }
+    fn cow_tasks_update_100_000() { cow_tasks_update_n(100_000) }
 
     #[test]
     fn cow_tasks_remove_10() { cow_tasks_remove_n(10) }
@@ -724,7 +719,7 @@ mod btree {
     #[test]
     fn cow_tasks_remove_10_000() { cow_tasks_remove_n(10_000) }
     #[test]
-    fn cow_tasks_remove_40_000() { cow_tasks_remove_n(40_000) }
+    fn cow_tasks_remove_100_000() { cow_tasks_remove_n(100_000) }
 
     #[test]
     fn cow_tasks_swap_10() { cow_tasks_swap_n(10) }
@@ -739,7 +734,7 @@ mod btree {
     #[test]
     fn cow_tasks_swap_10_000() { cow_tasks_swap_n(10_000) }
     #[test]
-    fn cow_tasks_swap_40_000() { cow_tasks_swap_n(40_000) }
+    fn cow_tasks_swap_100_000() { cow_tasks_swap_n(100_000) }
 
     #[test]
     fn cow_tasks_pop_10() { cow_tasks_pop_n(10) }
@@ -754,7 +749,7 @@ mod btree {
     #[test]
     fn cow_tasks_pop_10_000() { cow_tasks_pop_n(10_000) }
     #[test]
-    fn cow_tasks_pop_40_000() { cow_tasks_pop_n(40_000) }
+    fn cow_tasks_pop_100_000() { cow_tasks_pop_n(100_000) }
 
     #[test]
     fn cow_tasks_find_mut_10() { cow_tasks_find_mut_n(10) }
@@ -769,5 +764,5 @@ mod btree {
     #[test]
     fn cow_tasks_find_mut_10_000() { cow_tasks_find_mut_n(10_000) }
     #[test]
-    fn cow_tasks_find_mut_40_000() { cow_tasks_find_mut_n(40_000) }
+    fn cow_tasks_find_mut_100_000() { cow_tasks_find_mut_n(100_000) }
 }

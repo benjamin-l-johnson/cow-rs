@@ -15,6 +15,7 @@ struct NodeLeaf<K, V> {
 
 struct NodeInternal<K, V> {
     used:      uint,
+    total_len: uint,
     keys:      [K, ..INTERNAL_SIZE-1],
     children:  [Node<K, V>, ..INTERNAL_SIZE]
 }
@@ -201,6 +202,7 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
         let mut node = NodeInternal::new_empty();
         node.used = 2;
         node.keys[0] = key;
+        node.total_len = right.len() + left.len();
         node.children[0] = left;
         node.children[1] = right;
         node
@@ -210,6 +212,7 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
     {
         NodeInternal {
             used: 0,
+            total_len: 0,
             keys: [default(), default(), default(), default(),  // 0-3
                    default(), default(), default(), default(),  // 4-7
                    default(), default(), default(), default(),  // 8-11
@@ -241,7 +244,12 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
         let idx = self.search(key);
 
         match self.children[idx].insert(key, value) {
-            InsertDone(bool) => (InsertDone(bool)),
+            InsertDone(updated) => {
+                if !updated {
+                    self.total_len += 1;
+                }
+                InsertDone(updated)
+            },
             Split => {
                 if self.used == INTERNAL_SIZE {
                     Split
@@ -266,6 +274,7 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
                 }
             },
             InsertUpdateLeft(left) => {
+                self.total_len += 1;
                 if idx != self.used {
                     self.keys[idx] = left;
                     InsertUpdateLeft(self.keys[self.used-2].clone())
@@ -340,6 +349,10 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
 
         if needs_merge {
             self.redist(idx);
+        }
+
+        if value.is_some() {
+            self.total_len -= 1;
         }
 
         (key, value, self.used < INTERNAL_SIZE / 2)
@@ -433,11 +446,7 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
 
     fn len(&self) -> uint
     {
-        let mut len = 0;
-        for i in range(0, self.used) {
-            len += self.children[i].len();
-        }
-        len
+        self.total_len
     }
 
     #[inline(always)]
@@ -454,8 +463,11 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
                 left.children.swap(i, i+1);
             }
 
+            let size = self.children[self.used].len();
             left.used -= 1;
+            left.total_len -= size;
             self.used += 1;
+            self.total_len += size;
             true
         } else {
             false
@@ -479,8 +491,11 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
             }
             util::swap(&mut self.children[0], &mut right.children[right.used-1]);
 
+            let size = self.children[0].len();
             right.used -= 1;
+            right.total_len -= size;
             self.used += 1;
+            self.total_len += size;
             true
         } else {
             false
@@ -495,6 +510,7 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeInternal<K, V>
             util::swap(&mut right.keys[src], &mut self.keys[dst]);
             util::swap(&mut right.children[src], &mut self.children[dst]);
         }
+        self.total_len += right.total_len;
         self.used += right.used;
     }
 
@@ -685,7 +701,7 @@ impl<K: Default+Clone+TotalOrd, V: Default+Clone> NodeLeaf<K, V>
     #[inline(always)]
     fn len(&self) -> uint
     {
-        return self.used;
+        self.used
     }
 
     #[inline(always)]
