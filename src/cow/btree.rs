@@ -1041,3 +1041,11 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
         }
     }
 }
+
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Default for BTree<K, V>
+{
+    fn default() -> BTree<K, V>
+    {
+        BTree::new()
+    }
+}
