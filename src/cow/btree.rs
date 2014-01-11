@@ -26,8 +26,8 @@ enum Node<K, V> {
     Leaf(CowArc<NodeLeaf<K, V>>),
 }
 
-pub struct BTree<K, V> {
-    root: Node<K, V>
+pub struct BTreeMap<K, V> {
+    priv root: Node<K, V>
 }
 
 enum InsertAction<K> {
@@ -793,14 +793,14 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Container for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Container for BTreeMap<K, V> {
     fn len(&self) -> uint
     {
         self.root.len()
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V> for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V> for BTreeMap<K, V> {
     #[inline(always)]
     fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
@@ -825,14 +825,14 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K,
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable for BTreeMap<K, V> {
     fn clear(&mut self)
     {
         self.root = Empty;
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> MutableMap<K, V> for BTree<K, V> {
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> MutableMap<K, V> for BTreeMap<K, V> {
     #[inline(always)]
     fn swap(&mut self, key: K, value: V) -> Option<V>
     {
@@ -900,31 +900,31 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTree<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTreeMap<K, V>
 {
-    fn clone(&self) -> BTree<K, V>
+    fn clone(&self) -> BTreeMap<K, V>
     {
-        BTree {
+        BTreeMap {
             root: self.root.clone()
         }
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> BTreeMap<K, V>
 {
-    pub fn new() -> BTree<K, V>
+    pub fn new() -> BTreeMap<K, V>
     {
         //println!("{:?} {:?} {:?}",
         //        std::mem::size_of::<Node<K, V>>(),
         //        std::mem::size_of::<NodeLeaf<K, V>>(),
         //        std::mem::size_of::<NodeInternal<K, V>>()
         //);
-        BTree {
+        BTreeMap {
             root: Empty
         }
     }
 
-    pub fn iter<'a>(&'a self) -> BTreeIterator<'a, K, V>
+    pub fn iter<'a>(&'a self) -> BTreeMapIterator<'a, K, V>
     {
         let (leaf, stack) = match self.root {
             Leaf(ref leaf) => {
@@ -935,7 +935,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> BTree<
             },
             Empty => (None, ~[])
         };
-        BTreeIterator {
+        BTreeMapIterator {
             leaf: leaf,
             stack: stack,
             current: 0,
@@ -992,7 +992,7 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
     }
 }
 
-struct BTreeIterator<'a, K, V>
+struct BTreeMapIterator<'a, K, V>
 {
     stack: ~[NodeIterator<'a, K, V>],
     leaf: Option<LeafIterator<'a, K, V>>,
@@ -1006,7 +1006,7 @@ enum NodeIteratorRes<'a, K, V>
     LeafIter(LeafIterator<'a, K, V>)
 }
 
-impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for BTreeIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for BTreeMapIterator<'a, K, V>
 {
     #[inline(always)]
     fn next(&mut self) -> Option<(&'a K, &'a V)>
@@ -1042,10 +1042,101 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Default for BTree<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Default for BTreeMap<K, V>
 {
-    fn default() -> BTree<K, V>
+    fn default() -> BTreeMap<K, V>
     {
-        BTree::new()
+        BTreeMap::new()
+    }
+}
+
+pub struct BTreeSet<T> {
+    priv map: BTreeMap<T, ()>
+}
+
+struct BTreeSetIterator<'a, T>
+{
+    priv mapiter: BTreeMapIterator<'a, T, ()>
+}
+
+impl<T: Default+Clone+TotalOrd+Send+Freeze> BTreeSet<T>
+{
+    pub fn new() -> BTreeSet<T>
+    {
+        BTreeSet{map: BTreeMap::new()}
+    }
+
+    pub fn iter<'a>(&'a self) -> BTreeSetIterator<'a, T>
+    {
+        BTreeSetIterator {
+            mapiter: self.map.iter()
+        }
+    }
+}
+
+impl<T: Default+Clone+TotalOrd+Send+Freeze> Container for BTreeSet<T> {
+    fn len(&self) -> uint { self.map.len() }
+}
+
+impl<T: Default+Clone+TotalOrd+Send+Freeze> Mutable for BTreeSet<T> {
+    fn clear(&mut self) { self.map.clear() }
+}
+
+impl<T: Default+Clone+TotalOrd+Send+Freeze> Set<T> for BTreeSet<T> {
+    fn contains(&self, value: &T) -> bool { self.map.find(value).is_some() }
+
+    fn is_disjoint(&self, other: &BTreeSet<T>) -> bool {
+        self.iter().all(|v| !other.contains(v))
+    }
+
+    fn is_subset(&self, other: &BTreeSet<T>) -> bool {
+        self.iter().all(|v| other.contains(v))
+    }
+
+    fn is_superset(&self, other: &BTreeSet<T>) -> bool {
+        other.is_subset(self)
+    }
+}
+
+impl<T: Default+Clone+TotalOrd+Send+Freeze> MutableSet<T> for BTreeSet<T>
+{
+    fn insert(&mut self, value: T) -> bool
+    {
+        self.map.insert(value, ())
+    }
+
+    fn remove(&mut self, value: &T) -> bool
+    {
+        self.map.remove(value)
+    }
+}
+
+impl<'a, K: Default+Clone+TotalOrd+Send+Freeze> Iterator<&'a K> for BTreeSetIterator<'a, K>
+{
+    #[inline(always)]
+    fn next(&mut self) -> Option<(&'a K)>
+    {
+        match self.mapiter.next() {
+            Some((k, _)) => Some(k),
+            None => None
+        }
+    }
+}
+
+impl<T: Default+Clone+TotalOrd+Send+Freeze> Clone for BTreeSet<T>
+{
+    fn clone(&self) -> BTreeSet<T>
+    {
+        BTreeSet {
+            map: self.map.clone()
+        }
+    }
+}
+
+impl<T: Default+Clone+TotalOrd+Send+Freeze> Default for BTreeSet<T>
+{
+    fn default() -> BTreeSet<T>
+    {
+        BTreeSet::new()
     }
 }

@@ -80,11 +80,11 @@ mod cowcell {
 }
 
 mod btree {
-    use cow::btree::{BTree};
+    use cow::btree::{BTreeMap};
     use std::rand::{Rng, IsaacRng, SeedableRng};
     static NUM_TASKS: uint = 8;
 
-    fn check(btree: &BTree<uint, uint>, key: uint, expected: uint)
+    fn check(btree: &BTreeMap<uint, uint>, key: uint, expected: uint)
     {
         match btree.find(&key) {
             Some(val) => {
@@ -116,7 +116,7 @@ mod btree {
 
     fn insert_and_fetch_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         for i in range(0, len) {
             btree.insert(i, i);
@@ -131,7 +131,7 @@ mod btree {
 
     fn insert_and_fetch_shuffle_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         let build_arr = shuffled(len as uint);
 
@@ -148,7 +148,7 @@ mod btree {
 
     fn update_shuffle_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         let build_arr = shuffled(len as uint);
 
@@ -173,7 +173,7 @@ mod btree {
 
     fn remove_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         let build_arr = shuffled(len as uint);
 
@@ -197,7 +197,7 @@ mod btree {
 
     fn pop_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         let build_arr = shuffled(len as uint);
 
@@ -219,7 +219,7 @@ mod btree {
 
     fn find_mut_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         let build_arr = shuffled(len as uint);
 
@@ -247,7 +247,7 @@ mod btree {
 
     fn swap_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         let build_arr = shuffled(len as uint);
 
@@ -269,7 +269,7 @@ mod btree {
 
     fn insert_remove_shuffle_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         let build_arr = shuffled((len*4) as uint);
 
@@ -300,7 +300,7 @@ mod btree {
 
     fn iter_test_n(len: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
         let build_arr = shuffled(len as uint);
 
         let mut value_sum = 0;
@@ -455,7 +455,7 @@ mod btree {
     #[test]
     fn cow_clone()
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         for i in range(0, 1100u) {
             btree.insert(i, i);
@@ -489,7 +489,7 @@ mod btree {
 
     fn cow_tasks_append_n(count: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         for i in range(0, count) {
             btree.insert(i, i);
@@ -526,7 +526,7 @@ mod btree {
 
     fn cow_tasks_update_n(count: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         for i in range(0, count) {
             btree.insert(i, i);
@@ -556,7 +556,7 @@ mod btree {
 
     fn cow_tasks_remove_n(count: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         for i in range(0, count) {
             btree.insert(i, i);
@@ -587,7 +587,7 @@ mod btree {
 
     fn cow_tasks_swap_n(count: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         for i in range(0, count) {
             btree.insert(i, i);
@@ -617,7 +617,7 @@ mod btree {
 
     fn cow_tasks_pop_n(count: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         for i in range(0, count) {
             btree.insert(i, i);
@@ -647,7 +647,7 @@ mod btree {
 
     fn cow_tasks_find_mut_n(count: uint)
     {
-        let mut btree: BTree<uint, uint> = BTree::new();
+        let mut btree: BTreeMap<uint, uint> = BTreeMap::new();
 
         for i in range(0, count) {
             btree.insert(i, i);
