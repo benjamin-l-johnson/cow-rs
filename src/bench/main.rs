@@ -3,7 +3,7 @@
 extern mod cow;
 extern mod extra;
 
-use cow::btree::BTree;
+use cow::btree::BTreeMap;
 use extra::time::precise_time_s;
 use std::rand::{Rng, IsaacRng, SeedableRng};
 use std::hashmap::HashMap;
@@ -75,9 +75,9 @@ fn forward(count: uint) -> ~[uint]
 }
 
 #[inline(always)]
-fn btree_build(build_arr: ~[uint]) -> (~[uint], BTree<uint, uint>)
+fn btree_build(build_arr: ~[uint]) -> (~[uint], BTreeMap<uint, uint>)
 {
-    let mut btree = BTree::new();
+    let mut btree = BTreeMap::new();
     for &node in build_arr.iter() {
         btree.insert(node, node);
     }
@@ -88,14 +88,14 @@ fn btree_build(build_arr: ~[uint]) -> (~[uint], BTree<uint, uint>)
 #[inline(always)]
 fn btree_insert(_: uint, data: &~[uint])
 {
-    let mut btree = BTree::new();
+    let mut btree = BTreeMap::new();
     for &node in data.iter() {
         btree.insert(node, node);
     }
 }
 
 #[inline(always)]
-fn btree_find(_: uint, tup: &(~[uint], BTree<uint, uint>))
+fn btree_find(_: uint, tup: &(~[uint], BTreeMap<uint, uint>))
 {
     match *tup {
         (ref data, ref btree) => {
@@ -107,7 +107,7 @@ fn btree_find(_: uint, tup: &(~[uint], BTree<uint, uint>))
 }
 
 #[inline(always)]
-fn btree_clone(_: uint, tup: &(~[uint], BTree<uint, uint>))
+fn btree_clone(_: uint, tup: &(~[uint], BTreeMap<uint, uint>))
 {
     match *tup {
         (_, ref btree) => {
@@ -117,7 +117,7 @@ fn btree_clone(_: uint, tup: &(~[uint], BTree<uint, uint>))
 }
 
 #[inline(always)]
-fn btree_iter(_: uint, tup: &(~[uint], BTree<uint, uint>))
+fn btree_iter(_: uint, tup: &(~[uint], BTreeMap<uint, uint>))
 {
     match *tup {
         (_, ref btree) => {
