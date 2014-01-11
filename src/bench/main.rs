@@ -380,7 +380,7 @@ macro_rules! print_table_resp_s(
             }
             println!("");
         }
-        println("");
+        println!("");
     })
 )
 
@@ -401,7 +401,7 @@ macro_rules! print_table_abs(
             }
             println!("");
         }
-        println("");
+        println!("");
     })
 )
 
