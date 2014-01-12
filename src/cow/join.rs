@@ -9,10 +9,10 @@ pub fn join_maps<KEY: TotalOrd, DATA_A, DATA_B, IterA: Iterator<(KEY, DATA_A)>, 
 }
 
 impl<KEY: TotalOrd, DATA_A, DATA_B, IterA: Iterator<(KEY, DATA_A)>, IterB: Iterator<(KEY, DATA_B)>>
-    Iterator<(KEY, DATA_A, DATA_B)> for JoinMapIterator<IterA, IterB>
+    Iterator<(KEY, (DATA_A, DATA_B))> for JoinMapIterator<IterA, IterB>
 {
     #[inline]
-    fn next(&mut self) -> Option<(KEY, DATA_A, DATA_B)>
+    fn next(&mut self) -> Option<(KEY, (DATA_A, DATA_B))>
     {
         let (mut key_a, mut data_a) = match self.a.next() {
             None => return None,
@@ -35,7 +35,7 @@ impl<KEY: TotalOrd, DATA_A, DATA_B, IterA: Iterator<(KEY, DATA_A)>, IterB: Itera
                         }
                     };
                 },
-                Equal => return Some((key_a, data_a, data_b)),
+                Equal => return Some((key_a, (data_a, data_b))),
                 Greater => {
                     match self.b.next() {
                         None => return None,

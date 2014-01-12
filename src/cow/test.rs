@@ -784,7 +784,7 @@ mod join {
 
         let mut r_iter = range(0, 10);
 
-        for (k, data_a, data_b) in join_maps(a.iter(), b.iter()) {
+        for (k, (data_a, data_b)) in join_maps(a.iter(), b.iter()) {
             let i = r_iter.next().unwrap();
             assert!(i == *k);
             assert!(i == *data_a);
@@ -827,7 +827,7 @@ mod join {
             }
         }
 
-        for (k, _, _) in join_maps(a.iter(), b.iter()) {
+        for (k, _) in join_maps(a.iter(), b.iter()) {
             assert!(k % 2 == 0);
         }
     }
@@ -948,5 +948,33 @@ mod join {
         for (k, _) in join_set_to_map(a.iter(), b.iter()) {
             assert!(k % 2 == 0);
         }
+    }
+
+    #[test]
+    fn test_complex()
+    {
+        let mut a = BTreeSet::new();
+        let mut b = BTreeSet::new();
+        let mut c = BTreeMap::new();
+        let mut d = BTreeMap::new();
+
+        for i in range(0, 100) {
+            a.insert(i);
+            if i % 2 == 0 {
+                b.insert(i);
+            }
+            if i % 3 == 0 {
+                c.insert(i, i);
+            }
+            if i % 5 == 0 {
+                d.insert(i, i);
+            }
+        }
+
+        for (k, _) in join_set_to_map(join_sets(a.iter(), b.iter()), join_maps(c.iter(), d.iter()))
+        {
+            assert!(k % 30 == 0);
+        }
+
     }
 }
