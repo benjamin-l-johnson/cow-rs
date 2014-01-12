@@ -766,3 +766,187 @@ mod btree {
     #[test]
     fn cow_tasks_find_mut_100_000() { cow_tasks_find_mut_n(100_000) }
 }
+
+mod join {
+    use cow::btree::{BTreeMap, BTreeSet};
+    use cow::join::{join_maps, join_sets, join_set_to_map};
+
+    #[test]
+    fn test_map_join_10_shared_set()
+    {
+        let mut a = BTreeMap::new();
+        let mut b = BTreeMap::new();
+
+        for i in range(0, 10) {
+            a.insert(i, i);
+            b.insert(i, i);
+        }
+
+        let mut r_iter = range(0, 10);
+
+        for (k, data_a, data_b) in join_maps(a.iter(), b.iter()) {
+            let i = r_iter.next().unwrap();
+            assert!(i == *k);
+            assert!(i == *data_a);
+            assert!(i == *data_b);
+        }
+    }
+
+    #[test]
+    fn test_map_join_10_no_shared()
+    {
+        let mut a = BTreeMap::new();
+        let mut b = BTreeMap::new();
+
+        for i in range(0, 10) {
+            a.insert(i, i);
+        }
+
+        for i in range(10, 20) {
+            b.insert(i, i);
+        }
+
+        for _ in join_maps(a.iter(), b.iter()) {
+            fail!("should not have found any shared items!");
+        }
+    }
+
+    #[test]
+    fn test_map_join_10_even()
+    {
+        let mut a = BTreeMap::new();
+        let mut b = BTreeMap::new();
+
+        for i in range(0, 10) {
+            a.insert(i, i);
+        }
+
+        for i in range(0, 10) {
+            if i % 2 == 0 {
+                b.insert(i, i);
+            }
+        }
+
+        for (k, _, _) in join_maps(a.iter(), b.iter()) {
+            assert!(k % 2 == 0);
+        }
+    }
+
+    #[test]
+    fn test_set_join_10_shared_set()
+    {
+        let mut a = BTreeSet::new();
+        let mut b = BTreeSet::new();
+
+        for i in range(0, 10) {
+            a.insert(i);
+            b.insert(i);
+        }
+
+        let mut r_iter = range(0, 10);
+
+        for k in join_sets(a.iter(), b.iter()) {
+            let i = r_iter.next().unwrap();
+            assert!(i == *k);
+        }
+    }
+
+    #[test]
+    fn test_set_join_10_no_shared()
+    {
+        let mut a = BTreeSet::new();
+        let mut b = BTreeSet::new();
+
+        for i in range(0, 10) {
+            a.insert(i);
+        }
+
+        for i in range(10, 20) {
+            b.insert(i);
+        }
+
+        for _ in join_sets(a.iter(), b.iter()) {
+            fail!("should not have found any shared items!");
+        }
+    }
+
+    #[test]
+    fn test_set_join_10_even()
+    {
+        let mut a = BTreeSet::new();
+        let mut b = BTreeSet::new();
+
+        for i in range(0, 10) {
+            a.insert(i);
+        }
+
+        for i in range(0, 10) {
+            if i % 2 == 0 {
+                b.insert(i);
+            }
+        }
+
+        for k in join_sets(a.iter(), b.iter()) {
+            assert!(k % 2 == 0);
+        }
+    }
+
+    #[test]
+    fn test_map_and_set_join_10_shared_set()
+    {
+        let mut a = BTreeSet::new();
+        let mut b = BTreeMap::new();
+
+        for i in range(0, 10) {
+            a.insert(i);
+            b.insert(i, i);
+        }
+
+        let mut r_iter = range(0, 10);
+
+        for (k, _) in join_set_to_map(a.iter(), b.iter()) {
+            let i = r_iter.next().unwrap();
+            assert!(i == *k);
+        }
+    }
+
+    #[test]
+    fn test_map_and_set_join_10_no_shared()
+    {
+        let mut a = BTreeSet::new();
+        let mut b = BTreeMap::new();
+
+        for i in range(0, 10) {
+            a.insert(i);
+        }
+
+        for i in range(10, 20) {
+            b.insert(i, i);
+        }
+
+        for _ in join_set_to_map(a.iter(), b.iter()) {
+            fail!("should not have found any shared items!");
+        }
+    }
+
+    #[test]
+    fn test_map_and_set_join_10_even()
+    {
+        let mut a = BTreeSet::new();
+        let mut b = BTreeMap::new();
+
+        for i in range(0, 10) {
+            a.insert(i);
+        }
+
+        for i in range(0, 10) {
+            if i % 2 == 0 {
+                b.insert(i, i);
+            }
+        }
+
+        for (k, _) in join_set_to_map(a.iter(), b.iter()) {
+            assert!(k % 2 == 0);
+        }
+    }
+}

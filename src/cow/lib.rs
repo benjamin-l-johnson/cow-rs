@@ -12,6 +12,7 @@ use std::sync::atomics::{AtomicUint, SeqCst, Relaxed, Acquire};
 use std::vec;
 
 pub mod btree;
+pub mod join;
 
 /// An atomically reference counted pointer.
 ///
