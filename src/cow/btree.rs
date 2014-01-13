@@ -543,6 +543,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
         }
 
         new.used = self.used;
+        new.total_len = self.total_len;
 
         new
     }
@@ -992,7 +993,7 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
     }
 }
 
-struct BTreeMapIterator<'a, K, V>
+pub struct BTreeMapIterator<'a, K, V>
 {
     stack: ~[NodeIterator<'a, K, V>],
     leaf: Option<LeafIterator<'a, K, V>>,
@@ -1054,7 +1055,7 @@ pub struct BTreeSet<T> {
     priv map: BTreeMap<T, ()>
 }
 
-struct BTreeSetIterator<'a, T>
+pub struct BTreeSetIterator<'a, T>
 {
     priv mapiter: BTreeMapIterator<'a, T, ()>
 }
