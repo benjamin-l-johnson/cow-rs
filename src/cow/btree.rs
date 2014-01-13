@@ -30,9 +30,9 @@ pub struct BTreeMap<K, V> {
     priv root: Node<K, V>
 }
 
-enum InsertAction<K> {
+enum InsertAction<K, V> {
     InsertDone(bool),
-    Split,
+    Split(K, V),
     InsertUpdateLeft(K)
 }
 
@@ -56,7 +56,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
 impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
 {
     #[inline(always)]
-    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
+    fn insert(&mut self, key: K, value: V) -> InsertAction<K, V>
     {
         match *self {
             Empty => {
@@ -239,9 +239,9 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
     }
 
     #[inline(always)]
-    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
+    fn insert(&mut self, key: K, value: V) -> InsertAction<K, V>
     {
-        let idx = self.search(key);
+        let idx = self.search(&key);
 
         match self.children[idx].insert(key, value) {
             InsertDone(updated) => {
@@ -250,9 +250,9 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
                 }
                 InsertDone(updated)
             },
-            Split => {
+            Split(key, value) => {
                 if self.used == INTERNAL_SIZE {
-                    Split
+                    Split(key, value)
                 } else {
                     let (right, split_key) = self.children[idx].split();
                     let mut right = right;
@@ -604,21 +604,21 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
     }
 
     #[inline(always)]
-    fn insert(&mut self, key: &K, value: &V) -> InsertAction<K>
+    fn insert(&mut self, key: K, value: V) -> InsertAction<K, V>
     {
         if self.used == LEAF_SIZE {
-            Split
+            Split(key, value)
         } else {
-            let (found, insert) = self.search_key(key);
+            let (found, insert) = self.search_key(&key);
 
             // update
             if insert != self.used && found {
-                self.values[insert] = (*value).clone();
+                self.values[insert] = value;
                 InsertDone(true)
             // insert
             } else {
-                let mut key = (*key).clone();
-                let mut value = (*value).clone();
+                let mut key = key;
+                let mut value = value;
 
                 self.used += 1;
 
@@ -871,13 +871,13 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
     #[inline(always)]
     fn insert(&mut self, key: K, value: V) -> bool
     {
-        match self.root.insert(&key, &value) {
+        match self.root.insert(key, value) {
             InsertDone(update) => update,
             // if the left key is only updated
             // on an insert, not an update so this
             // can return false
             InsertUpdateLeft(_) => false,
-            Split => {
+            Split(key, value) => {
                 let (split_key, right) = match self.root {
                     Leaf(ref mut leaf) => {
                         let (right, key) = leaf.get_mut().split();
