@@ -501,7 +501,7 @@ mod btree {
 
         for offset in range(1u, NUM_TASKS+1) {
             let new = btree.clone();
-            do spawn {
+            spawn(proc() {
                 let mut new = new;
                 for i in range(count, count*2) {
                     new.insert(i, i+offset);
@@ -512,7 +512,7 @@ mod btree {
                 for i in range(count, count*2) {
                     check(&new, i, i+offset);
                 }
-            }
+            });
         }
 
         for i in range(0, count) {
@@ -538,7 +538,7 @@ mod btree {
 
         for offset in range(1u, NUM_TASKS+1) {
             let new = btree.clone();
-            do spawn {
+            spawn(proc() {
                 let mut new = new;
                 for i in range(0, count) {
                     new.insert(i, i+offset);
@@ -546,7 +546,7 @@ mod btree {
                 for i in range(0, count) {
                     check(&new, i, i+offset);
                 }
-            }
+            });
         }
 
         for i in range(0, count) {
@@ -568,7 +568,7 @@ mod btree {
 
         for _ in range(1u, NUM_TASKS+1) {
             let new = btree.clone();
-            do spawn {
+            spawn(proc() {
                 let mut new = new;
                 for i in range(0, count) {
                     new.remove(&i);
@@ -577,7 +577,7 @@ mod btree {
                 for i in range(0, count) {
                     assert!(new.find(&i).is_none());
                 } 
-            }
+            });
         }
 
         for i in range(0, count) {
@@ -599,7 +599,7 @@ mod btree {
 
         for offset in range(1u, NUM_TASKS+1) {
             let new = btree.clone();
-            do spawn {
+            spawn(proc() {
                 let mut new = new;
                 for i in range(0, count) {
                     assert!(new.swap(i, i+offset).is_some());
@@ -607,7 +607,7 @@ mod btree {
                 for i in range(0, count) {
                     check(&new, i, i+offset);
                 }
-            }
+            });
         }
 
         for i in range(0, count) {
@@ -629,7 +629,7 @@ mod btree {
 
         for _ in range(1u, NUM_TASKS+1) {
             let new = btree.clone();
-            do spawn {
+            spawn(proc() {
                 let mut new = new;
                 for i in range(0, count) {
                     assert!(new.pop(&i).is_some());
@@ -637,7 +637,7 @@ mod btree {
                 for i in range(0, count) {
                     assert!(new.pop(&i).is_none());
                 }
-            }
+            });
         }
 
         for i in range(0, count) {
@@ -659,7 +659,7 @@ mod btree {
 
         for offset in range(1u, NUM_TASKS+1) {
             let new = btree.clone();
-            do spawn {
+            spawn(proc() {
                 let mut new = new;
                 for i in range(0, count) {
                     let val = new.find_mut(&i).unwrap();
@@ -668,7 +668,7 @@ mod btree {
                 for i in range(0, count) {
                     check(&new, i, i+offset);
                 }
-            }
+            });
         }
 
         for i in range(0, count) {

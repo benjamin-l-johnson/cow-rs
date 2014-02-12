@@ -1,7 +1,8 @@
 use CowArc;
 
+use std::mem;
+
 use std::default::Default;
-use std::util;
 use std::iter::range_step;
 
 static LEAF_SIZE: uint = 31;
@@ -185,7 +186,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
             let mut child = Empty;
             match *self {
                 Internal(ref mut node) => {
-                    util::swap(&mut child, &mut node.get_mut().children[0]);
+                    mem::swap(&mut child, &mut node.get_mut().children[0]);
                 },
                 Leaf(_) => {},
                 _ => fail!("invalid node")
@@ -262,11 +263,11 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
 
                     // move items left
                     for j in range(idx-1, self.used) {
-                        util::swap(&mut self.keys[j], &mut split_key);
+                        mem::swap(&mut self.keys[j], &mut split_key);
                     }
 
                     for j in range(idx, self.used+1) {
-                        util::swap(&mut self.children[j], &mut right);
+                        mem::swap(&mut self.children[j], &mut right);
                     }
 
                     self.used += 1;
@@ -313,7 +314,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         };
 
         let mut child = Empty;
-        util::swap(&mut child, &mut self.children[insert+1]);
+        mem::swap(&mut child, &mut self.children[insert+1]);
 
         self.children[insert].merge(child);
         self.keys[insert] = self.children[insert].max_key();
@@ -428,18 +429,18 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
         let mut right = NodeInternal::new_empty();
 
         for (dst, src) in range(INTERNAL_SIZE / 2, self.used).enumerate() {
-            util::swap(&mut right.children[dst], &mut self.children[src]);
+            mem::swap(&mut right.children[dst], &mut self.children[src]);
         }
 
         for (dst, src) in range(INTERNAL_SIZE / 2, self.used-1).enumerate() {
-            util::swap(&mut right.keys[dst], &mut self.keys[src]);
+            mem::swap(&mut right.keys[dst], &mut self.keys[src]);
         }
 
         right.used = self.used - INTERNAL_SIZE / 2;
         self.used =  INTERNAL_SIZE / 2;
 
         let mut key: K = default();
-        util::swap(&mut key, &mut self.keys[self.used-1]);
+        mem::swap(&mut key, &mut self.keys[self.used-1]);
 
         (right, key)
     }
@@ -458,7 +459,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
                 left.keys.swap(i, i+1);
             }
 
-            util::swap(&mut self.children[self.used], &mut left.children[0]);
+            mem::swap(&mut self.children[self.used], &mut left.children[0]);
             for i in range(0, left.used-1) {
                 left.children.swap(i, i+1);
             }
@@ -489,7 +490,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
                 let i = self.used - i;
                 self.children.swap(i, i-1);
             }
-            util::swap(&mut self.children[0], &mut right.children[right.used-1]);
+            mem::swap(&mut self.children[0], &mut right.children[right.used-1]);
 
             let size = self.children[0].len();
             right.used -= 1;
@@ -507,8 +508,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
     {
         self.keys[self.used-1] = self.children[self.used-1].max_key();
         for (src, dst) in range(self.used, self.used+right.used).enumerate() {
-            util::swap(&mut right.keys[src], &mut self.keys[dst]);
-            util::swap(&mut right.children[src], &mut self.children[dst]);
+            mem::swap(&mut right.keys[src], &mut self.keys[dst]);
+            mem::swap(&mut right.children[src], &mut self.children[dst]);
         }
         self.total_len += right.total_len;
         self.used += right.used;
@@ -623,8 +624,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
                 self.used += 1;
 
                 for j in range(insert, self.used) {
-                    util::swap(&mut self.keys[j], &mut key);
-                    util::swap(&mut self.values[j], &mut value);
+                    mem::swap(&mut self.keys[j], &mut key);
+                    mem::swap(&mut self.values[j], &mut value);
                 }
 
                 if insert == self.used {
@@ -650,8 +651,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         let offset = self.used - 1 + idx;
         for i in range(idx, self.used) {
             let i = offset - i;
-            util::swap(&mut self.keys[i], &mut key);
-            util::swap(&mut self.values[i], &mut value);
+            mem::swap(&mut self.keys[i], &mut key);
+            mem::swap(&mut self.values[i], &mut value);
         }
 
         self.used -= 1;
@@ -689,8 +690,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
         let mut right = NodeLeaf::new();
 
         for (dst, src) in range(LEAF_SIZE / 2, self.used).enumerate() {
-            util::swap(&mut right.keys[dst], &mut self.keys[src]);
-            util::swap(&mut right.values[dst], &mut self.values[src]);
+            mem::swap(&mut right.keys[dst], &mut self.keys[src]);
+            mem::swap(&mut right.values[dst], &mut self.values[src]);
         }
 
         right.used = self.used - LEAF_SIZE / 2;
@@ -709,12 +710,12 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
     fn rotate_left(&mut self, left: &mut NodeLeaf<K, V>) -> bool
     {
         if left.used > LEAF_SIZE / 2 {
-            util::swap(&mut self.keys[self.used], &mut left.keys[0]);
+            mem::swap(&mut self.keys[self.used], &mut left.keys[0]);
             for i in range(0, left.used-1) {
                 left.keys.swap(i, i+1);
             }
 
-            util::swap(&mut self.values[self.used], &mut left.values[0]);
+            mem::swap(&mut self.values[self.used], &mut left.values[0]);
             for i in range(0, left.used-1) {
                 left.values.swap(i, i+1);
             }
@@ -735,13 +736,13 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
                 let i = self.used + 1 - i;
                 self.keys.swap(i, i-1);
             }
-            util::swap(&mut self.keys[0], &mut right.keys[right.used-1]);
+            mem::swap(&mut self.keys[0], &mut right.keys[right.used-1]);
 
             for i in range(0, self.used+1) {
                 let i = self.used + 1 - i;
                 self.values.swap(i, i-1);
             }
-            util::swap(&mut self.values[0], &mut right.values[right.used-1]);
+            mem::swap(&mut self.values[0], &mut right.values[right.used-1]);
 
             right.used -= 1;
             self.used += 1;
@@ -755,8 +756,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
     fn merge(&mut self, right: &mut NodeLeaf<K, V>)
     {
         for (src, dst) in range(self.used, self.used+right.used).enumerate() {
-            util::swap(&mut right.keys[src], &mut self.keys[dst]);
-            util::swap(&mut right.values[src], &mut self.values[dst]);
+            mem::swap(&mut right.keys[src], &mut self.keys[dst]);
+            mem::swap(&mut right.values[src], &mut self.values[dst]);
         }
         self.used += right.used;
     }
@@ -840,7 +841,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
         match self.find_mut(&key) {
             Some(v) => {
                 let mut value = value;
-                util::swap(&mut value, v);
+                mem::swap(&mut value, v);
                 return Some(value);
             },
             _ => ()
@@ -892,7 +893,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
                 };
                 let mut left = Empty;
 
-                util::swap(&mut self.root, &mut left);
+                mem::swap(&mut self.root, &mut left);
 
                 self.root = Internal(CowArc::new(NodeInternal::new(split_key, left, right)));
                 self.insert(key, value)
