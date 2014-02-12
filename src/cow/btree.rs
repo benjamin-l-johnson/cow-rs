@@ -1,4 +1,4 @@
-use CowArc;
+use sync::CowArc;
 
 use std::mem;
 
