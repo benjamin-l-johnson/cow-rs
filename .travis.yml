@@ -5,7 +5,7 @@ install:
   - sudo apt-get install rust-nightly
 script:
   - rustc src/cow/lib.rs
-  - rustc src/cow/test.rs -L .
+  - rustc --test src/cow/test.rs -L .
   - ./test
 
 
