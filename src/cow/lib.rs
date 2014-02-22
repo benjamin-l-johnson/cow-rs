@@ -3,7 +3,7 @@
 #[license = "ASL2"];
 #[crate_type = "lib"];
 
-extern mod sync;
+extern crate sync;
 
 pub mod btree;
 pub mod join;

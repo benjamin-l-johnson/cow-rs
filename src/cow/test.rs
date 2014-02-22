@@ -1,4 +1,4 @@
-extern mod cow;
+extern crate cow;
 
 mod btree {
     use cow::btree::{BTreeMap};

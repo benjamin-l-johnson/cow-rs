@@ -1,7 +1,7 @@
 #[feature(macro_rules)];
 
-extern mod cow;
-extern mod extra;
+extern crate cow;
+extern crate extra;
 
 use cow::btree::BTreeMap;
 use extra::time::precise_time_s;
