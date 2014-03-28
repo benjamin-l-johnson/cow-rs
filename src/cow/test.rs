@@ -1,8 +1,9 @@
 extern crate cow;
+extern crate rand;
 
 mod btree {
     use cow::btree::{BTreeMap};
-    use std::rand::{Rng, IsaacRng, SeedableRng};
+    use rand::{Rng, IsaacRng, SeedableRng};
     static NUM_TASKS: uint = 8;
 
     fn check(btree: &BTreeMap<uint, uint>, key: uint, expected: uint)
