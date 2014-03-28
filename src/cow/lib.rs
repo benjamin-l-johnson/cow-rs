@@ -2,6 +2,8 @@
 #[comment = "An OpenGL function loader."];
 #[license = "ASL2"];
 #[crate_type = "lib"];
+#[crate_type = "dylib"];
+#[allow(experimental)];
 
 extern crate sync;
 

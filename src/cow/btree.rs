@@ -1,4 +1,4 @@
-use sync::CowArc;
+use sync::Arc;
 
 use std::mem;
 
@@ -23,8 +23,8 @@ struct NodeInternal<K, V> {
 
 enum Node<K, V> {
     Empty,
-    Internal(CowArc<NodeInternal<K, V>>),
-    Leaf(CowArc<NodeLeaf<K, V>>),
+    Internal(Arc<NodeInternal<K, V>>),
+    Leaf(Arc<NodeLeaf<K, V>>),
 }
 
 pub struct BTreeMap<K, V> {
@@ -42,7 +42,7 @@ fn default<T: Default>() -> T
     Default::default()
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for Node<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Clone for Node<K, V>
 {
     fn clone(&self) -> Node<K, V>
     {
@@ -54,21 +54,21 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Node<K, V>
 {
     #[inline(always)]
     fn insert(&mut self, key: K, value: V) -> InsertAction<K, V>
     {
         match *self {
             Empty => {
-                *self = Leaf(CowArc::new(NodeLeaf::new()));
+                *self = Leaf(Arc::new(NodeLeaf::new()));
                 self.insert(key, value)
             },
             Leaf(ref mut leaf) => {
-                leaf.get_mut().insert(key, value)
+                leaf.make_unique().insert(key, value)
             },
             Internal(ref mut node) => {
-                node.get_mut().insert(key, value)
+                node.make_unique().insert(key, value)
             }
         }
     }
@@ -77,8 +77,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     {
         match *self {
             Empty => (None, None, false),
-            Leaf(ref mut leaf) => leaf.get_mut().pop(key),
-            Internal(ref mut node) => node.get_mut().pop(key)
+            Leaf(ref mut leaf) => leaf.make_unique().pop(key),
+            Internal(ref mut node) => node.make_unique().pop(key)
         }        
     }
 
@@ -86,12 +86,12 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     {
         match *self {
             Leaf(ref mut leaf) => {
-                let (leaf, key) = leaf.get_mut().split();
-                (Leaf(CowArc::new(leaf)), key)
+                let (leaf, key) = leaf.make_unique().split();
+                (Leaf(Arc::new(leaf)), key)
             },
             Internal(ref mut node) => {
-                let (node, key) = node.get_mut().split();
-                (Internal(CowArc::new(node)), key)
+                let (node, key) = node.make_unique().split();
+                (Internal(Arc::new(node)), key)
             },
             _ => {
                 fail!("unsupported split");
@@ -103,8 +103,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     {
         match *self {
             Empty => {0u},
-            Leaf(ref leaf) => leaf.get().len(),
-            Internal(ref node) => node.get().len()
+            Leaf(ref leaf) => leaf.deref().len(),
+            Internal(ref node) => node.deref().len()
         }     
     }
 
@@ -112,8 +112,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     {
         match *self {
             Empty => None,
-            Leaf(ref mut leaf) => leaf.get_mut().find_mut(key),
-            Internal(ref mut node) => node.get_mut().find_mut(key)
+            Leaf(ref mut leaf) => leaf.make_unique().find_mut(key),
+            Internal(ref mut node) => node.make_unique().find_mut(key)
         }
     }
 
@@ -122,10 +122,10 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     {
         match (self, src) {
             (&Leaf(ref mut sink), &Leaf(ref mut src)) => {
-                sink.get_mut().rotate_right(src.get_mut())
+                sink.make_unique().rotate_right(src.make_unique())
             },
             (&Internal(ref mut sink), &Internal(ref mut src)) => {
-                sink.get_mut().rotate_right(src.get_mut())
+                sink.make_unique().rotate_right(src.make_unique())
             },
             (_, _) => {
                 fail!("both nodes should be of the same type");
@@ -138,10 +138,10 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     {
         match (self, src) {
             (&Leaf(ref mut sink), &Leaf(ref mut src)) => {
-                sink.get_mut().rotate_left(src.get_mut())
+                sink.make_unique().rotate_left(src.make_unique())
             },
             (&Internal(ref mut sink), &Internal(ref mut src)) => {
-                sink.get_mut().rotate_left(src.get_mut())
+                sink.make_unique().rotate_left(src.make_unique())
             },
             (_, _) => {
                 fail!("both nodes should be of the same type");
@@ -154,10 +154,10 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     {
         match (self, src) {
             (&Leaf(ref mut sink), Leaf(ref mut src)) => {
-                sink.get_mut().merge(src.get_mut());
+                sink.make_unique().merge(src.make_unique());
             },
             (&Internal(ref mut sink), Internal(ref mut src)) => {
-                sink.get_mut().merge(src.get_mut());
+                sink.make_unique().merge(src.make_unique());
             },
             (_, _) => {
                 fail!("both nodes should be of the same type");
@@ -168,8 +168,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     fn max_key(&self) -> K
     {
         match *self {
-            Leaf(ref leaf) => leaf.get().max_key(),
-            Internal(ref node) => node.get().max_key(),
+            Leaf(ref leaf) => leaf.deref().max_key(),
+            Internal(ref node) => node.deref().max_key(),
             Empty => fail!("invalid node")
         }
     }
@@ -177,8 +177,8 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     fn lift(&mut self)
     {
         let depleted = match *self {
-            Internal(ref node) => node.get().used == 1,
-            Leaf(ref leaf) => leaf.get().used == 0,
+            Internal(ref node) => node.deref().used == 1,
+            Leaf(ref leaf) => leaf.deref().used == 0,
             _ => false
         };
 
@@ -186,7 +186,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
             let mut child = Empty;
             match *self {
                 Internal(ref mut node) => {
-                    mem::swap(&mut child, &mut node.get_mut().children[0]);
+                    mem::swap(&mut child, &mut node.make_unique().children[0]);
                 },
                 Leaf(_) => {},
                 _ => fail!("invalid node")
@@ -196,7 +196,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Node<K
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeInternal<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> NodeInternal<K, V>
 {
     fn new(key: K, left: Node<K, V>, right: Node<K, V>) -> NodeInternal<K, V>
     {
@@ -529,7 +529,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeIn
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeInternal<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Clone for NodeInternal<K, V>
 {
     fn clone(&self) -> NodeInternal<K, V>
     {
@@ -551,7 +551,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
 }
 
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLeaf<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> NodeLeaf<K, V>
 {
     fn new() -> NodeLeaf<K, V>
     {
@@ -778,7 +778,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> NodeLe
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for NodeLeaf<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Clone for NodeLeaf<K, V>
 {
     fn clone(&self) -> NodeLeaf<K, V>
     {
@@ -795,14 +795,14 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Container for BTreeMap<K, V> {
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Container for BTreeMap<K, V> {
     fn len(&self) -> uint
     {
         self.root.len()
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K, V> for BTreeMap<K, V> {
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Map<K, V> for BTreeMap<K, V> {
     #[inline(always)]
     fn find<'a>(&'a self, key: &K) -> Option<&'a V>
     {
@@ -812,10 +812,10 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K,
         while target_leaf.is_none() {
             match *target {
                 Internal(ref node) => {
-                    target = &node.get().children[node.get().search(key)];
+                    target = &node.deref().children[node.deref().search(key)];
                 },
                 Leaf(ref leaf) => {
-                    target_leaf = Some(leaf.get());
+                    target_leaf = Some(leaf.deref());
                 },
                 Empty => {
                     return None;
@@ -827,14 +827,14 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Map<K,
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutable for BTreeMap<K, V> {
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Mutable for BTreeMap<K, V> {
     fn clear(&mut self)
     {
         self.root = Empty;
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> MutableMap<K, V> for BTreeMap<K, V> {
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> MutableMap<K, V> for BTreeMap<K, V> {
     #[inline(always)]
     fn swap(&mut self, key: K, value: V) -> Option<V>
     {
@@ -881,12 +881,12 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
             Split(key, value) => {
                 let (split_key, right) = match self.root {
                     Leaf(ref mut leaf) => {
-                        let (right, key) = leaf.get_mut().split();
-                        (key, Leaf(CowArc::new(right)))
+                        let (right, key) = leaf.make_unique().split();
+                        (key, Leaf(Arc::new(right)))
                     },
                     Internal(ref mut node) => {
-                        let (right, key) = node.get_mut().split();
-                        (key, Internal(CowArc::new(right)))
+                        let (right, key) = node.make_unique().split();
+                        (key, Internal(Arc::new(right)))
 
                     }
                     _ => fail!("this is impossible")
@@ -895,14 +895,14 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Mutabl
 
                 mem::swap(&mut self.root, &mut left);
 
-                self.root = Internal(CowArc::new(NodeInternal::new(split_key, left, right)));
+                self.root = Internal(Arc::new(NodeInternal::new(split_key, left, right)));
                 self.insert(key, value)
             }
         }
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone for BTreeMap<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Clone for BTreeMap<K, V>
 {
     fn clone(&self) -> BTreeMap<K, V>
     {
@@ -912,7 +912,7 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Clone 
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> BTreeMap<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> BTreeMap<K, V>
 {
     pub fn new() -> BTreeMap<K, V>
     {
@@ -930,10 +930,10 @@ impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> BTreeM
     {
         let (leaf, stack) = match self.root {
             Leaf(ref leaf) => {
-                (Some(leaf.get().iter()), ~[])
+                (Some(leaf.deref().iter()), ~[])
             }
             Internal(ref node) => {
-                (None, ~[node.get().iter()])
+                (None, ~[node.deref().iter()])
             },
             Empty => (None, ~[])
         };
@@ -952,7 +952,7 @@ struct NodeIterator<'a, K, V>
     node: &'a NodeInternal<K, V>
 }
 
-impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<NodeIteratorRes<'a,K,V>> for NodeIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Iterator<NodeIteratorRes<'a,K,V>> for NodeIterator<'a, K, V>
 {
     fn next(&mut self) -> Option<NodeIteratorRes<'a,K,V>>
     {
@@ -961,10 +961,10 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
             self.idx += 1;
             match self.node.children[idx] {
                 Leaf(ref leaf) => {
-                    Some(LeafIter(leaf.get().iter()))
+                    Some(LeafIter(leaf.deref().iter()))
                 },
                 Internal(ref node) => {
-                    Some(InternalIter(node.get().iter()))
+                    Some(InternalIter(node.deref().iter()))
                 }
                 Empty => None             
             }
@@ -974,13 +974,13 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
     }
 }
 
-struct LeafIterator<'a, K, V>
+pub struct LeafIterator<'a, K, V>
 {
-    idx: uint,
-    leaf: &'a NodeLeaf<K, V>
+    priv idx: uint,
+    priv leaf: &'a NodeLeaf<K, V>
 }
 
-impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for LeafIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Iterator<(&'a K, &'a V)> for LeafIterator<'a, K, V>
 {
     fn next(&mut self) -> Option<(&'a K, &'a V)>
     {
@@ -996,10 +996,10 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
 
 pub struct BTreeMapIterator<'a, K, V>
 {
-    stack: ~[NodeIterator<'a, K, V>],
-    leaf: Option<LeafIterator<'a, K, V>>,
-    current: uint,
-    end: uint
+    priv stack: ~[NodeIterator<'a, K, V>],
+    priv leaf: Option<LeafIterator<'a, K, V>>,
+    priv current: uint,
+    priv end: uint
 }
 
 enum NodeIteratorRes<'a, K, V>
@@ -1008,7 +1008,7 @@ enum NodeIteratorRes<'a, K, V>
     LeafIter(LeafIterator<'a, K, V>)
 }
 
-impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Iterator<(&'a K, &'a V)> for BTreeMapIterator<'a, K, V>
+impl<'a, K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Iterator<(&'a K, &'a V)> for BTreeMapIterator<'a, K, V>
 {
     #[inline(always)]
     fn next(&mut self) -> Option<(&'a K, &'a V)>
@@ -1044,7 +1044,7 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> It
     }
 }
 
-impl<K: Default+Clone+TotalOrd+Send+Freeze, V: Default+Clone+Send+Freeze> Default for BTreeMap<K, V>
+impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Default for BTreeMap<K, V>
 {
     fn default() -> BTreeMap<K, V>
     {
@@ -1061,7 +1061,7 @@ pub struct BTreeSetIterator<'a, T>
     priv mapiter: BTreeMapIterator<'a, T, ()>
 }
 
-impl<T: Default+Clone+TotalOrd+Send+Freeze> BTreeSet<T>
+impl<T: Default+Clone+TotalOrd+Send+Share> BTreeSet<T>
 {
     pub fn new() -> BTreeSet<T>
     {
@@ -1076,15 +1076,15 @@ impl<T: Default+Clone+TotalOrd+Send+Freeze> BTreeSet<T>
     }
 }
 
-impl<T: Default+Clone+TotalOrd+Send+Freeze> Container for BTreeSet<T> {
+impl<T: Default+Clone+TotalOrd+Send+Share> Container for BTreeSet<T> {
     fn len(&self) -> uint { self.map.len() }
 }
 
-impl<T: Default+Clone+TotalOrd+Send+Freeze> Mutable for BTreeSet<T> {
+impl<T: Default+Clone+TotalOrd+Send+Share> Mutable for BTreeSet<T> {
     fn clear(&mut self) { self.map.clear() }
 }
 
-impl<T: Default+Clone+TotalOrd+Send+Freeze> Set<T> for BTreeSet<T> {
+impl<T: Default+Clone+TotalOrd+Send+Share> Set<T> for BTreeSet<T> {
     fn contains(&self, value: &T) -> bool { self.map.find(value).is_some() }
 
     fn is_disjoint(&self, other: &BTreeSet<T>) -> bool {
@@ -1100,7 +1100,7 @@ impl<T: Default+Clone+TotalOrd+Send+Freeze> Set<T> for BTreeSet<T> {
     }
 }
 
-impl<T: Default+Clone+TotalOrd+Send+Freeze> MutableSet<T> for BTreeSet<T>
+impl<T: Default+Clone+TotalOrd+Send+Share> MutableSet<T> for BTreeSet<T>
 {
     fn insert(&mut self, value: T) -> bool
     {
@@ -1113,7 +1113,7 @@ impl<T: Default+Clone+TotalOrd+Send+Freeze> MutableSet<T> for BTreeSet<T>
     }
 }
 
-impl<'a, K: Default+Clone+TotalOrd+Send+Freeze> Iterator<&'a K> for BTreeSetIterator<'a, K>
+impl<'a, K: Default+Clone+TotalOrd+Send+Share> Iterator<&'a K> for BTreeSetIterator<'a, K>
 {
     #[inline(always)]
     fn next(&mut self) -> Option<(&'a K)>
@@ -1125,7 +1125,7 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Freeze> Iterator<&'a K> for BTreeSetIter
     }
 }
 
-impl<T: Default+Clone+TotalOrd+Send+Freeze> Clone for BTreeSet<T>
+impl<T: Default+Clone+TotalOrd+Send+Share> Clone for BTreeSet<T>
 {
     fn clone(&self) -> BTreeSet<T>
     {
@@ -1135,7 +1135,7 @@ impl<T: Default+Clone+TotalOrd+Send+Freeze> Clone for BTreeSet<T>
     }
 }
 
-impl<T: Default+Clone+TotalOrd+Send+Freeze> Default for BTreeSet<T>
+impl<T: Default+Clone+TotalOrd+Send+Share> Default for BTreeSet<T>
 {
     fn default() -> BTreeSet<T>
     {
