@@ -22,7 +22,7 @@ mod btree {
 
     fn shuffled(count: uint) -> ~[uint]
     {
-        let mut rng = IsaacRng::new();
+        let mut rng = IsaacRng::new().unwrap();
         rng.reseed([60388u32]);
 
         let mut build_arr = ~[];
@@ -31,7 +31,7 @@ mod btree {
             build_arr.push(i as uint);
         }
 
-        rng.shuffle_mut(build_arr);
+        rng.shuffle(build_arr);
 
         build_arr
     }
