@@ -28,7 +28,7 @@ enum Node<K, V> {
 }
 
 pub struct BTreeMap<K, V> {
-    priv root: Node<K, V>
+    root: Node<K, V>
 }
 
 enum InsertAction<K, V> {
@@ -976,8 +976,8 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Iter
 
 pub struct LeafIterator<'a, K, V>
 {
-    priv idx: uint,
-    priv leaf: &'a NodeLeaf<K, V>
+    idx: uint,
+    leaf: &'a NodeLeaf<K, V>
 }
 
 impl<'a, K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Iterator<(&'a K, &'a V)> for LeafIterator<'a, K, V>
@@ -996,10 +996,10 @@ impl<'a, K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Iter
 
 pub struct BTreeMapIterator<'a, K, V>
 {
-    priv stack: ~[NodeIterator<'a, K, V>],
-    priv leaf: Option<LeafIterator<'a, K, V>>,
-    priv current: uint,
-    priv end: uint
+    stack: ~[NodeIterator<'a, K, V>],
+    leaf: Option<LeafIterator<'a, K, V>>,
+    current: uint,
+    end: uint
 }
 
 enum NodeIteratorRes<'a, K, V>
@@ -1053,12 +1053,12 @@ impl<K: Default+Clone+TotalOrd+Send+Share, V: Default+Clone+Send+Share> Default 
 }
 
 pub struct BTreeSet<T> {
-    priv map: BTreeMap<T, ()>
+    map: BTreeMap<T, ()>
 }
 
 pub struct BTreeSetIterator<'a, T>
 {
-    priv mapiter: BTreeMapIterator<'a, T, ()>
+    mapiter: BTreeMapIterator<'a, T, ()>
 }
 
 impl<T: Default+Clone+TotalOrd+Send+Share> BTreeSet<T>

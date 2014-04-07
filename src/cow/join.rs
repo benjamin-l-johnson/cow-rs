@@ -1,6 +1,6 @@
 
 
-pub struct JoinMapIterator<A, B> {priv a: A, priv b: B}
+pub struct JoinMapIterator<A, B> {a: A, b: B}
 
 pub fn join_maps<KEY: TotalOrd, DATA_A, DATA_B, IterA: Iterator<(KEY, DATA_A)>, IterB: Iterator<(KEY, DATA_B)>>
     (a: IterA, b: IterB) -> JoinMapIterator<IterA, IterB> 
@@ -50,7 +50,7 @@ impl<KEY: TotalOrd, DATA_A, DATA_B, IterA: Iterator<(KEY, DATA_A)>, IterB: Itera
     }
 }
 
-pub struct JoinSetIterator<A, B> {priv a: A, priv b: B}
+pub struct JoinSetIterator<A, B> {a: A, b: B}
 
 pub fn join_sets<KEY: TotalOrd, IterA: Iterator<KEY>, IterB: Iterator<KEY>>
     (a: IterA, b: IterB) -> JoinSetIterator<IterA, IterB> 
@@ -94,7 +94,7 @@ impl<KEY: TotalOrd, IterA: Iterator<KEY>, IterB: Iterator<KEY>>
     }
 }
 
-pub struct JoinMapSetIterator<A, B> {priv set: A, priv map: B}
+pub struct JoinMapSetIterator<A, B> {set: A, map: B}
 
 pub fn join_set_to_map<KEY: TotalOrd, DATA, SetIter: Iterator<KEY>, MapIter: Iterator<(KEY, DATA)>>
     (set: SetIter, map: MapIter) -> JoinMapSetIterator<SetIter, MapIter> 
